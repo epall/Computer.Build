@@ -1,12 +1,14 @@
 (ns computer_build.vhdl)
 
-(defn lines [& strings]
-  (apply str (interpose "\n" strings))
+(defn indented-lines [strings]
+  (map #(str (apply str (take 1 (cycle ["  "]))) %) strings)
   )
 
-(defn indented-lines [indent & strings]
-  (apply lines (map #(str "  " %) strings))
-  )
+(defn indent-lines [lines]
+  (if (empty? lines) '()
+    (if (string? (first lines)) (cons (first lines) (indent-lines (rest lines)))
+      (concat (indented-lines (indent-lines (first lines))) (indent-lines (rest lines)))
+      )))
 
 (defn spaces [& strings]
   (apply str (interpose " " strings))
@@ -20,22 +22,23 @@
 (defmethod to-vhdl :default [arg] "unimplemented")
 (defmethod to-vhdl 'entity [entity]
   (let [[type name ports & architecture] entity]
-    (lines
+    (apply str (interpose "\n" (indent-lines
+    (list
       (spaces "entity" name "is")
       "port("
-      ;(spaces (concat '(port) (first ports)))
-      ;(interpose " " (concat '(port) (first ports)))
-      (apply str (interpose ";\n" (map to-vhdl (map #(cons 'port %) ports))))
+      (map #(apply str %)
+           (partition 2 (concat (interpose ";" 
+               (map to-vhdl (map #(cons 'port %) ports))) [""])))
       ");"
       (str "end " name ";")
 
       (str "architecture arch_" name " of " name " is")
       "begin"
-      (apply lines (map to-vhdl architecture))
+      (map to-vhdl architecture)
       (str "end arch_" name ";")
+  ))))))
 
-      ;(lines (map to-vhdl (map ports #(concat '(port) %))))
-  )))
+; does not generate lines like block-level methods do
 (defmethod to-vhdl 'port [port]
   (let [[type id direction type] port]
     (str "  " (keyword-to-str id) ": " (keyword-to-str direction) " " type)
@@ -43,23 +46,23 @@
 
 (defmethod to-vhdl 'process [process]
   (let [[type ports & definition] process]
-    (indented-lines 1
+    (list
       (str "process(" (apply str (interpose "," (map keyword-to-str ports))) ")")
       "begin"
-      (apply lines (map to-vhdl definition))
+      (map to-vhdl definition)
       "end process;"
       )))
 
 (defmethod to-vhdl 'case [statement]
   (let [[type target & cases] statement]
-    (indented-lines 2
+    (list
       (spaces "case" (keyword-to-str target) "is")
-      ;(lines (map #(str "when" (str "\"" (first %) "\""))
-      (apply lines (map #(str "when \"" (first %) "\" => " (to-vhdl (second %)) \;)
-           (partition 2 cases)))
+      (map #(str "when \"" (first %) "\" => " (to-vhdl (second %)) \;)
+           (partition 2 cases))
       "end case;"
     )))
 
+; does not generate lines like block-level methods do
 (defmethod to-vhdl '<= [statement]
   (let [[type target expression] statement]
     (str (keyword-to-str target) " <= " (keyword-to-str expression))
@@ -70,6 +73,5 @@
     (println "library ieee;")
     (println "use ieee.std_logic_1164.all;")
     (println (to-vhdl (first entities)))
-    ;(println (lines (map to-vhdl entities)))
     )
   )
