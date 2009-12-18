@@ -16,7 +16,7 @@
          (partition 2 (concat (interpose ";" lines) [""]))))
 
 (defn keyword-to-str [sym]
-  (if (keyword? sym) (apply str (rest (str sym))) (str \" sym \")))
+  (if (keyword? sym) (name sym) (str \" sym \")))
 
 (defn quoted-str [string] (str \" string \"))
 
