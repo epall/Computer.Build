@@ -1,4 +1,6 @@
-entity "Mux" do |mux|
+require 'computer_build/vhdl'
+
+mux = entity "Mux" do |mux|
   mux.port :I3, :in, "std_logic_vector(2 downto 0)"
   mux.port :I2, :in, "std_logic_vector(2 downto 0)"
   mux.port :I1, :in, "std_logic_vector(2 downto 0)"
@@ -12,8 +14,10 @@ entity "Mux" do |mux|
         c["01"] = assign :O, :I1
         c["10"] = assign :O, :I2
         c["11"] = assign :O, :I3
-        c[:default] = assign :O, "ZZZ"
+        c["others"] = assign :O, "ZZZ"
       end
     end
   end
 end
+
+generate_vhdl mux
