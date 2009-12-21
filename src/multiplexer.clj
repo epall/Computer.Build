@@ -1,4 +1,4 @@
-(use 'computer_build.vhdl)
+(use 'computer-build.vhdl)
 
 (generate-vhdl
   '(entity "Mux"

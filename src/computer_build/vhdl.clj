@@ -1,4 +1,4 @@
-(ns computer_build.vhdl
+(ns computer-build.vhdl
   (:use clojure.contrib.str-utils))
 
 (defn indented-lines [strings] (map (partial str "  ") strings))
