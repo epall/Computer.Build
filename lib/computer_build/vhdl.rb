@@ -51,14 +51,15 @@ module VHDL
   class Behavior
     def initialize(body)
       body.call(self)
+      @definition = []
     end
 
     def process(inputs, &body)
-      @process = VHDL::Process.new(inputs, body)
+      @definition << VHDL::Process.new(inputs, body)
     end
     
     def generate(indent)
-      @process.generate(indent+1)
+      @definition.each {|d| d.generate(indent+1) }
     end
   end
 
