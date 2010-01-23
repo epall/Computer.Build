@@ -1,5 +1,12 @@
 (ns computer-build.vhdl
-  (:use clojure.contrib.str-utils))
+  (:use clojure.contrib.str-utils)
+  (:require [clojure.core :as core]))
+
+(def entity)
+(def process)
+(def port)
+(def case)
+(def assign)
 
 (defn indented-lines [strings] (map (partial str "  ") strings))
 
@@ -21,13 +28,13 @@
 (defn quoted-str [string] (str \" string \"))
 
 (defmulti to-vhdl first)
-(defmethod to-vhdl :default [arg] "###UNIMPLEMENTED###")
-(defmethod to-vhdl 'entity [[type name ports & architecture]]
+(defmethod to-vhdl :default [arg] (str "###UNIMPLEMENTED: " (first arg) "###"))
+(defmethod to-vhdl 'computer-build.vhdl/entity [[type name ports & architecture]]
   (apply str (interpose "\n" (indent-lines
   (list
     (spaces "entity" name "is")
     "port("
-    (commaify (map to-vhdl (map (partial cons 'port) ports)))
+    (commaify (map to-vhdl (map (partial cons 'computer-build.vhdl/port) ports)))
     ");"
     (str "end " name ";")
 
@@ -37,17 +44,17 @@
     (str "end arch_" name ";"))))))
 
 ; does not generate lines like block-level methods do
-(defmethod to-vhdl 'port [[type id direction type]]
+(defmethod to-vhdl 'computer-build.vhdl/port [[type id direction type]]
   (str (keyword-to-str id) ": " (keyword-to-str direction) " " type))
 
-(defmethod to-vhdl 'process [[type ports & definition]]
+(defmethod to-vhdl 'computer-build.vhdl/process [[type ports & definition]]
   (list
     (str "process(" (str-join "," (map keyword-to-str ports)) ")")
     "begin"
     (map to-vhdl definition)
     "end process;"))
 
-(defmethod to-vhdl 'case [[type target & cases]]
+(defmethod to-vhdl 'computer-build.vhdl/case [[type target & cases]]
   (list
     (spaces "case" (keyword-to-str target) "is")
     (map #(str (spaces "when" (quoted-str (first %)) "=>" (to-vhdl (second %))) \;)
@@ -55,7 +62,7 @@
     "end case;"))
 
 ; does not generate lines like block-level methods do
-(defmethod to-vhdl '<= [[type target expression]]
+(defmethod to-vhdl 'computer-build.vhdl/assign [[type target expression]]
   (spaces (keyword-to-str target) "<=" (keyword-to-str expression)))
 
 (defn generate-vhdl [& entities]
