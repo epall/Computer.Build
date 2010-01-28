@@ -60,6 +60,28 @@
 (defmethod to-vhdl :<= [[type target expression]]
   (spaces (keyword-to-str target) "<=" (keyword-to-str expression)))
 
+(defmethod to-vhdl :signal [[type name type]]
+  (str "signal " name " : " type ";"))
+
+(defmethod to-vhdl :deftype [[type name values]]
+  (let [valuelist (str-join ", " values)]
+    (spaces "type" name "is" "(" valuelist ");")))
+
+(defmethod to-vhdl :if [[type condition & body]]
+  (list
+    (spaces "if" (to-vhdl condition) "then")
+    (map to-vhdl body)))
+
+(defmethod to-vhdl :and [[type condA condB]]
+  (spaces (to-vhdl condA) "and" (to-vhdl condB)))
+
+(defmethod to-vhdl :event [[type target]]
+  (str (keyword-to-str target) "'EVENT"))
+
+(defmethod to-vhdl := [[type condA condB]]
+  (spaces (name condA) "=" condB))
+
+
 (defn generate-vhdl [& entities]
   (do
     (println "library ieee;")
