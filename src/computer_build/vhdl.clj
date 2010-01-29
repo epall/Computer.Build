@@ -70,7 +70,8 @@
 (defmethod to-vhdl :if [[type condition & body]]
   (list
     (spaces "if" (to-vhdl condition) "then")
-    (map to-vhdl body)))
+    (map to-vhdl body)
+    "end if;"))
 
 (defmethod to-vhdl :and [[type condA condB]]
   (spaces (to-vhdl condA) "and" (to-vhdl condB)))
