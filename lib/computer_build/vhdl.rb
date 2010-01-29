@@ -3,16 +3,27 @@ module VHDL
     attr_reader :name
     def initialize(name, body)
       @name = name
+      @ports = []
+      @signals = []
+      @types = []
       body[self]
     end
 
     def port(id, direction, description)
-      @ports ||= []
       @ports << Port.new(id, direction, description)
     end
 
+    def signal(id, type)
+      @signals << Signal.new(id, type)
+    end
+
+
     def behavior(&body)
       @behavior = Behavior.new(body)
+    end
+
+    def type(name, values)
+      @types << Type.new(name, values)
     end
 
     def generate
@@ -24,9 +35,23 @@ module VHDL
       puts ");"
       puts "end #{@name};"
       puts "architecture arch_#{@name} of #{@name} is"
+      @types.each {|t| t.generate 1}
+      @signals.each {|t| t.generate 1}
       puts "begin"
       @behavior.generate 1
       puts "end arch_#{@name};"
+    end
+  end
+
+  class Type
+    def initialize(name, values)
+      @name = name
+      @values = values
+    end
+
+    def generate(indent)
+      print "  " * indent
+      print "type #{@name} is ( #{@values.join(", ")} );\n"
     end
   end
 
@@ -48,10 +73,22 @@ module VHDL
     end
   end
 
+  class Signal
+    def initialize(id, type)
+      @id = id
+      @type = type
+    end
+
+    def generate(indent)
+      print "  " * indent
+      puts "signal #{@id} : #{@type};"
+    end
+  end
+
   class Behavior
     def initialize(body)
-      body.call(self)
       @definition = []
+      body.call(self)
     end
 
     def process(inputs, &body)
@@ -66,11 +103,16 @@ module VHDL
   class Process
     def initialize(inputs, body)
       @inputs = inputs
+      @statements = []
       body.call(self)
     end
 
     def case(input, &body)
-      @case = Case.new(input, body)
+      @statements << Case.new(input, body)
+    end
+
+    def if(*conditions, &body)
+      @statements << If.new(conditions, body)
     end
 
     def generate(indent)
@@ -78,7 +120,7 @@ module VHDL
       args = @inputs.map(&:to_s).join(',')
       puts prefix + "process(#{args})"
       puts prefix + "begin"
-      @case.generate(indent + 2)
+      @statements.each {|s| s.generate(indent + 2)}
       puts prefix + "end process;"
     end
   end
@@ -102,6 +144,26 @@ module VHDL
     end
   end
 
+  class If
+    def initialize(conditions, body)
+      @conditions = conditions
+      @statements = []
+      body[self]
+    end
+
+    def case(input, &body)
+      @statements << Case.new(input, body)
+    end
+
+
+    def generate(indent)
+      conditions = @conditions.map &:generate
+      puts ("  "*indent)+"if #{conditions.join(' and ')} then"
+      @statements.each {|s| s.generate(indent+2)}
+      puts ("  "*indent)+"end if;"
+    end
+  end
+
   class Assign
     def initialize(target, expression)
       @target = target
@@ -114,6 +176,29 @@ module VHDL
       return "#{@target} <= #{expression}"
     end
   end
+
+  class Equal
+    def initialize(target, expression)
+      @target = target
+      @expression = expression
+    end
+    
+    def generate
+      expression = @expression
+      expression = "\'#{expression}\'" if expression.instance_of? String
+      return "#{@target} = #{expression}"
+    end
+  end
+
+  class Event
+    def initialize(target)
+      @target = target
+    end
+
+    def generate
+      return "#{@target.to_s}'EVENT"
+    end
+  end
 end
 
 # Global scope methods for creating stuff
@@ -124,6 +209,14 @@ end
 
 def assign(target, expression)
   VHDL::Assign.new(target, expression)
+end
+
+def equal(target, expression)
+  VHDL::Equal.new(target, expression)
+end
+
+def event(target)
+  VHDL::Event.new(target)
 end
 
 def generate_vhdl(entity)
