@@ -1,4 +1,41 @@
 module VHDL
+  module StatementBlock
+    def case(input, &body)
+      @statements << Case.new(input, body)
+    end
+
+    def if(*conditions, &body)
+      @statements << If.new(conditions, body)
+    end
+  end
+
+  class SingleLineStatement
+    def generate(indent)
+      print "  " * indent
+      print self.line()
+      print "\n"
+    end
+  end
+  
+  class MultiLineStatement
+  end
+
+  class InlineStatement
+    protected
+
+    def quoted(expression)
+      if expression.instance_of? String
+        if expression.length == 1
+          return "'#{expression}'"
+        else
+          return "\"#{expression}\""
+        end
+      else
+        return expression
+      end
+    end
+  end
+
   class Entity
     attr_reader :name
     def initialize(name, body)
@@ -9,12 +46,12 @@ module VHDL
       body[self]
     end
 
-    def port(id, direction, description)
-      @ports << Port.new(id, direction, description)
+    def port(*args)
+      @ports << Port.new(*args)
     end
 
-    def signal(id, type)
-      @signals << Signal.new(id, type)
+    def signal(*args)
+      @signals << Signal.new(*args)
     end
 
 
@@ -22,8 +59,8 @@ module VHDL
       @behavior = Behavior.new(body)
     end
 
-    def type(name, values)
-      @types << Type.new(name, values)
+    def type(*args)
+      @types << Type.new(*args)
     end
 
     def generate
@@ -43,19 +80,18 @@ module VHDL
     end
   end
 
-  class Type
+  class Type < SingleLineStatement
     def initialize(name, values)
       @name = name
       @values = values
     end
 
-    def generate(indent)
-      print "  " * indent
-      print "type #{@name} is ( #{@values.join(", ")} );\n"
+    def line
+      "type #{@name} is ( #{@values.join(", ")} );"
     end
   end
 
-  class Port
+  class Port < SingleLineStatement
     def initialize(id, direction, description)
       @id = id
       @direction = direction
@@ -65,23 +101,18 @@ module VHDL
     def generate(indent, last)
       print "  " * indent
       print "#{@id}: #{@direction} #{@description}"
-      if last
-        puts
-      else
-        puts ';'
-      end
+      puts last ? '' : ';'
     end
   end
 
-  class Signal
+  class Signal < SingleLineStatement
     def initialize(id, type)
       @id = id
       @type = type
     end
 
-    def generate(indent)
-      print "  " * indent
-      puts "signal #{@id} : #{@type};"
+    def line
+      "signal #{@id} : #{@type};"
     end
   end
 
@@ -101,18 +132,11 @@ module VHDL
   end
 
   class Process
+    include StatementBlock
     def initialize(inputs, body)
       @inputs = inputs
       @statements = []
-      body.call(self)
-    end
-
-    def case(input, &body)
-      @statements << Case.new(input, body)
-    end
-
-    def if(*conditions, &body)
-      @statements << If.new(conditions, body)
+      body[self]
     end
 
     def generate(indent)
@@ -137,66 +161,58 @@ module VHDL
       puts prefix+"case #{@input} is"
       @conditions.sort.each do |pair|
         condition, expression = pair
-
         puts prefix+"  "+"when \"#{condition}\" => #{expression.generate};"
       end
       puts prefix+"end case;"
     end
   end
 
-  class If
+  class If < MultiLineStatement
+    include StatementBlock
+
     def initialize(conditions, body)
       @conditions = conditions
       @statements = []
       body[self]
     end
 
-    def case(input, &body)
-      @statements << Case.new(input, body)
-    end
-
-
     def generate(indent)
-      conditions = @conditions.map &:generate
-      puts ("  "*indent)+"if #{conditions.join(' and ')} then"
+      conditions = @conditions.map(&:generate).join(' and ')
+      puts ("  "*indent)+"if #{conditions} then"
       @statements.each {|s| s.generate(indent+2)}
       puts ("  "*indent)+"end if;"
     end
   end
 
-  class Assign
+  class Assign < InlineStatement
     def initialize(target, expression)
       @target = target
       @expression = expression
     end
     
     def generate
-      expression = @expression
-      expression = "\"#{expression}\"" if expression.instance_of? String
-      return "#{@target} <= #{expression}"
+      "#{@target} <= #{quoted(@expression)}"
     end
   end
 
-  class Equal
+  class Equal < InlineStatement
     def initialize(target, expression)
       @target = target
       @expression = expression
     end
     
     def generate
-      expression = @expression
-      expression = "\'#{expression}\'" if expression.instance_of? String
-      return "#{@target} = #{expression}"
+      "#{@target} = #{quoted(@expression)}"
     end
   end
 
-  class Event
+  class Event < InlineStatement
     def initialize(target)
       @target = target
     end
 
     def generate
-      return "#{@target.to_s}'EVENT"
+      "#{@target.to_s}'EVENT"
     end
   end
 end
