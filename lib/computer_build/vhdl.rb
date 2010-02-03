@@ -1,4 +1,14 @@
 module VHDL
+  STD_LOGIC = "std_logic"
+
+  def self.STD_LOGIC_VECTOR(range)
+    if range.first > range.last
+      return "std_logic_vector(#{range.first} downto #{range.last})"
+    else
+      return "std_logic_vector(#{range.first} upto #{range.last})"
+    end
+  end
+
   module StatementBlock
     def case(input, &body)
       @statements << Case.new(input, body)
@@ -6,6 +16,15 @@ module VHDL
 
     def if(*conditions, &body)
       @statements << If.new(conditions, body)
+    end
+
+    def assign(target, expression)
+      @statements << Assignment.new(target, expression)
+    end
+
+    # Default generate, generally overridden
+    def generate(indent)
+      @statements.each {|s| s.generate(indent + 1)}
     end
   end
 
@@ -144,7 +163,7 @@ module VHDL
       args = @inputs.map(&:to_s).join(',')
       puts prefix + "process(#{args})"
       puts prefix + "begin"
-      @statements.each {|s| s.generate(indent + 2)}
+      @statements.each {|s| s.generate(indent + 1)}
       puts prefix + "end process;"
     end
   end
@@ -159,9 +178,23 @@ module VHDL
     def generate(indent)
       prefix = "  " * indent
       puts prefix+"case #{@input} is"
-      @conditions.sort.each do |pair|
+      @conditions.each do |pair|
         condition, expression = pair
-        puts prefix+"  "+"when \"#{condition}\" => #{expression.generate};"
+        print prefix+"  when "
+        if condition =~ /^\d$/
+          print "'#{condition}'"
+        elsif condition =~ /^\d+$/
+          print "\"#{condition}\""
+        else
+          print condition
+        end
+        print " =>"
+        if expression.is_a? InlineStatement
+          puts expression.generate
+        else
+          puts
+          expression.generate(indent+1)
+        end
       end
       puts prefix+"end case;"
     end
@@ -181,6 +214,16 @@ module VHDL
       puts ("  "*indent)+"if #{conditions} then"
       @statements.each {|s| s.generate(indent+2)}
       puts ("  "*indent)+"end if;"
+    end
+  end
+
+  class Assignment < SingleLineStatement
+    def initialize(*args)
+      @assign = Assign.new(*args)
+    end
+
+    def line
+      @assign.generate + ";"
     end
   end
 
