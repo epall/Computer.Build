@@ -1,11 +1,11 @@
 module VHDL
-  STD_LOGIC = "std_logic"
+  STD_LOGIC = "STD_LOGIC"
 
   def self.STD_LOGIC_VECTOR(range)
     if range.first > range.last
-      return "std_logic_vector(#{range.first} downto #{range.last})"
+      return "STD_LOGIC_VECTOR(#{range.first} downto #{range.last})"
     else
-      return "std_logic_vector(#{range.first} upto #{range.last})"
+      return "STD_LOGIC_VECTOR(#{range.first} upto #{range.last})"
     end
   end
 
@@ -83,19 +83,19 @@ module VHDL
     end
 
     def generate
-      puts "entity #{@name} is"
-      puts "port("
+      puts "ENTITY #{@name} IS"
+      puts "PORT("
       @ports.each_with_index do |port, index|
         port.generate 1, (index == @ports.length-1)
       end
       puts ");"
-      puts "end #{@name};"
-      puts "architecture arch_#{@name} of #{@name} is"
+      puts "END #{@name};"
+      puts "ARCHITECTURE arch_#{@name} OF #{@name} IS"
       @types.each {|t| t.generate 1}
       @signals.each {|t| t.generate 1}
-      puts "begin"
+      puts "BEGIN"
       @behavior.generate 1
-      puts "end arch_#{@name};"
+      puts "END arch_#{@name};"
     end
   end
 
@@ -106,7 +106,7 @@ module VHDL
     end
 
     def line
-      "type #{@name} is ( #{@values.join(", ")} );"
+      "TYPE #{@name} IS ( #{@values.join(", ")} );"
     end
   end
 
@@ -131,7 +131,7 @@ module VHDL
     end
 
     def line
-      "signal #{@id} : #{@type};"
+      "SIGNAL #{@id} : #{@type};"
     end
   end
 
@@ -161,10 +161,10 @@ module VHDL
     def generate(indent)
       prefix = "  " * indent
       args = @inputs.map(&:to_s).join(',')
-      puts prefix + "process(#{args})"
-      puts prefix + "begin"
+      puts prefix + "PROCESS(#{args})"
+      puts prefix + "BEGIN"
       @statements.each {|s| s.generate(indent + 1)}
-      puts prefix + "end process;"
+      puts prefix + "END PROCESS;"
     end
   end
 
@@ -177,10 +177,10 @@ module VHDL
 
     def generate(indent)
       prefix = "  " * indent
-      puts prefix+"case #{@input} is"
+      puts prefix+"CASE #{@input} IS"
       @conditions.each do |pair|
         condition, expression = pair
-        print prefix+"  when "
+        print prefix+"  WHEN "
         if condition =~ /^\d$/
           print "'#{condition}'"
         elsif condition =~ /^\d+$/
@@ -196,7 +196,7 @@ module VHDL
           expression.generate(indent+1)
         end
       end
-      puts prefix+"end case;"
+      puts prefix+"END CASE;"
     end
   end
 
@@ -211,9 +211,9 @@ module VHDL
 
     def generate(indent)
       conditions = @conditions.map(&:generate).join(' and ')
-      puts ("  "*indent)+"if #{conditions} then"
-      @statements.each {|s| s.generate(indent+2)}
-      puts ("  "*indent)+"end if;"
+      puts ("  "*indent)+"IF #{conditions} THEN"
+      @statements.each {|s| s.generate(indent+1)}
+      puts ("  "*indent)+"END IF;"
     end
   end
 
@@ -279,7 +279,7 @@ def event(target)
 end
 
 def generate_vhdl(entity)
-  puts "library ieee;"
-  puts "use ieee.std_logic_1164.all;"
+  puts "LIBRARY ieee;"
+  puts "USE ieee.std_logic_1164.all;"
   entity.generate
 end
