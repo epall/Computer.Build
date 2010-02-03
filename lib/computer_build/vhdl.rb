@@ -15,11 +15,13 @@ module VHDL
     end
 
     def if(*conditions, &body)
-      @statements << If.new(conditions, body)
+      ifthenelse = If.new(conditions, body)
+      @statements << ifthenelse
+      return ifthenelse
     end
 
-    def assign(target, expression)
-      @statements << Assignment.new(target, expression)
+    def assign(*args)
+      @statements << Assignment.new(*args)
     end
 
     # Default generate, generally overridden
@@ -205,15 +207,54 @@ module VHDL
 
     def initialize(conditions, body)
       @conditions = conditions
+      @compound = false
       @statements = []
       body[self]
     end
 
+    def elsif(*conditions, &body)
+      unless @compound
+        @clauses = [@statements]
+        @conditions = [@conditions]
+      end
+      @compound = true
+
+      @statements = []
+      body.call(self)
+      @clauses << @statements
+      @conditions << conditions
+    end
+
+    def else(*conditions, &body)
+      @whentrue = @statements
+      @statements = []
+      body.call(self)
+    end
+
     def generate(indent)
-      conditions = @conditions.map(&:generate).join(' and ')
-      puts ("  "*indent)+"IF #{conditions} THEN"
-      @statements.each {|s| s.generate(indent+1)}
-      puts ("  "*indent)+"END IF;"
+      if @compound
+        conditions = @conditions.first.map(&:generate).join(' and ')
+        puts ("  "*indent)+"IF #{conditions} THEN"
+        @clauses.first.each {|s| s.generate(indent+1)}
+        @clauses[1..100].zip(@conditions[1..100]).each do |statements, conditions|
+          conditions = conditions.map(&:generate).join(' and ')
+          puts ("  "*indent)+"ELSIF #{conditions} THEN"
+          statements.each {|s| s.generate(indent+1)}
+        end
+        puts ("  "*indent)+"END IF;"
+      elsif @whentrue
+        conditions = @conditions.map(&:generate).join(' and ')
+        puts ("  "*indent)+"IF #{conditions} THEN"
+        @whentrue.each {|s| s.generate(indent+1)}
+        puts ("  "*indent)+"ELSE"
+        @statements.each {|s| s.generate(indent+1)}
+        puts ("  "*indent)+"END IF;"
+      else
+        conditions = @conditions.map(&:generate).join(' and ')
+        puts ("  "*indent)+"IF #{conditions} THEN"
+        @statements.each {|s| s.generate(indent+1)}
+        puts ("  "*indent)+"END IF;"
+      end
     end
   end
 
@@ -228,9 +269,15 @@ module VHDL
   end
 
   class Assign < InlineStatement
-    def initialize(target, expression)
-      @target = target
-      @expression = expression
+    def initialize(*args)
+      if args.length == 2
+        @target = args[0]
+        @expression = args[1]
+      else
+        @target = args[0].to_s + "(#{args[1]})"
+        @expression = args[2].to_s + "(#{args[3]})"
+        @expression = @expression.to_sym
+      end
     end
     
     def generate
@@ -258,6 +305,15 @@ module VHDL
       "#{@target.to_s}'EVENT"
     end
   end
+
+  class Block < MultiLineStatement
+    include StatementBlock
+
+    def initialize(body)
+      @statements = []
+      body.call(self)
+    end
+  end
 end
 
 # Global scope methods for creating stuff
@@ -276,6 +332,10 @@ end
 
 def event(target)
   VHDL::Event.new(target)
+end
+
+def block(&body)
+  VHDL::Block.new(body)
 end
 
 def generate_vhdl(entity)
