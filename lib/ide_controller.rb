@@ -34,24 +34,24 @@ controller = state_machine "ide_controller" do |m|
   m.reset do |r|
     r.goto :wait
 
-    r.assign :ide_reset_n, '0'
-    r.assign :ide_data_write_n, '1'
-    r.assign :ide_data_read_n, '1'
+    r.low :ide_reset_n
+    r.high :ide_data_write_n
+    r.high :ide_data_read_n
     r.assign :ide_address, '000'
-    r.assign :ide_cs_1f0_n, '1'
-    r.assign :ide_cs_3f0_n, '1'
+    r.high :ide_cs_1f0_n
+    r.high :ide_cs_3f0_n
     r.assign :ide_data_out, '0000000000000000'
 
     r.assign :result_command, "00000000"
     r.assign :result_status, "00000000"
     r.assign :result_data, "0000000000000000"
-    r.assign :read_instr, '0'
-    r.assign :write_result, '0'
+    r.low :read_instr
+    r.low :write_result
   end
 
   m.state :wait do |s|
-    s.assign :ide_reset_n, '1'
-    s.assign :write_result, '0'
+    s.high :ide_reset_n
+    s.low :write_result
     s.assign :read_instr, :available_instr
   end
 
@@ -61,7 +61,7 @@ controller = state_machine "ide_controller" do |m|
     s.assign :command_buffer, :instr_command
     s.assign :address_buffer, :instr_address
     s.assign :data_buffer, :instr_data
-    s.assign :read_instr, '0'
+    s.low :read_instr
 
     s.case(:instr_command) do |c|
       c["00000000"] = block do |b|
@@ -82,7 +82,7 @@ controller = state_machine "ide_controller" do |m|
         b.assign :ide_address, 0, :instr_address, 0
         b.assign :ide_address, 1, :instr_address, 1
         b.assign :ide_address, 2, :instr_address, 2
-        b.assign :ide_cs_1f0_n, '0'
+        b.low :ide_cs_1f0_n
       end
     end
   end
@@ -95,9 +95,9 @@ controller = state_machine "ide_controller" do |m|
     :on => equal(:instr_command, "00000010")
   
   m.state :writestatus do |s|
-    assign :write_result, '1'
-    assign :ide_cs_1f0_n, '1'
-    assign :ide_data_read_n, '1'
+    s.high :write_result
+    s.high :ide_cs_1f0_n
+    s.high :ide_data_read_n
   end
 
   m.transition :from => :writestatus, :to => :wait
@@ -110,15 +110,15 @@ controller = state_machine "ide_controller" do |m|
     ifelse.else do |b|
       b.assign :result_data, "0000000000000000"
     end
-    s.assign :ide_data_OE, '0'
+    s.low :ide_data_OE
   end
 
   m.transition :from => :action, :to => :writestatus
 
   m.state :data_on_bus do |s|
     s.if equal(:command_buffer, "00000011") do |b|
-      assign :ide_data_write_n, '1'
-      assign :ide_data_read_n, '0'
+      b.high :ide_data_write_n
+      b.low :ide_data_read_n
     end
   end
 

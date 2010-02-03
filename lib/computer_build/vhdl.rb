@@ -24,6 +24,14 @@ module VHDL
       @statements << Assignment.new(*args)
     end
 
+    def high(target)
+      assign(target, '1')
+    end
+
+    def low(target)
+      assign(target, '0')
+    end
+
     # Default generate, generally overridden
     def generate(indent)
       @statements.each {|s| s.generate(indent + 1)}
@@ -324,6 +332,14 @@ end
 
 def assign(target, expression)
   VHDL::Assign.new(target, expression)
+end
+
+def high(target)
+  assign(target, '1')
+end
+
+def low(target)
+  assign(target, '0')
 end
 
 def equal(target, expression)
