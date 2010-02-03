@@ -10,11 +10,11 @@ mux = entity "Mux" do |mux|
   mux.behavior do |b|
     b.process [:I3, :I2, :I1, :I0, :S] do |p|
       p.case :S do |c|
-        c["00"] = assign :O, :I0
-        c["01"] = assign :O, :I1
-        c["10"] = assign :O, :I2
-        c["11"] = assign :O, :I3
-        c["others"] = assign :O, "ZZZ"
+        c["00"] = :O <= :I0
+        c["01"] = :O <= :I1
+        c["10"] = :O <= :I2
+        c["11"] = :O <= :I3
+        c["others"] = :O <= "ZZZ"
       end
     end
   end

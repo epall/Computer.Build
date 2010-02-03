@@ -354,6 +354,13 @@ def block(&body)
   VHDL::Block.new(body)
 end
 
+# Monkeypatching
+class Symbol
+  def <=(other)
+    return assign(self, other)
+  end
+end
+
 def generate_vhdl(entity)
   puts "LIBRARY ieee;"
   puts "USE ieee.std_logic_1164.all;"
