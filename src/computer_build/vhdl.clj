@@ -8,7 +8,11 @@
   (if (empty? line) '()
     (if (string? line)
       (cons line (indent-lines lines))
-      (concat (indented-lines (indent-lines line)) (indent-lines lines)))))
+      (concat
+          (if (:noindent (meta line))
+              (indent-lines line)
+              (indented-lines (indent-lines line)))
+          (indent-lines lines)))))
 
 (defn spaces [& strings] (str-join " " strings))
 
@@ -35,7 +39,7 @@
     (str "architecture arch_" name " of " name " is")
     (map to-vhdl defs)
     "begin"
-    (map to-vhdl architecture)
+    (with-meta (map to-vhdl architecture) {:noindent true})
     (str "end arch_" name ";"))))))
 
 ; does not generate lines like block-level methods do
@@ -46,7 +50,7 @@
   (list
     (str "process(" (str-join "," (map keyword-to-str ports)) ")")
     "begin"
-    (map to-vhdl definition)
+    (with-meta (map to-vhdl definition) {:noindent true})
     "end process;"))
 
 (defmethod to-vhdl :case [[type target & cases]]
@@ -70,7 +74,7 @@
 (defmethod to-vhdl :if [[type condition & body]]
   (list
     (spaces "if" (to-vhdl condition) "then")
-    (map to-vhdl body)
+    (with-meta (map to-vhdl body) {:noindent true})
     "end if;"))
 
 (defmethod to-vhdl :and [[type condA condB]]
