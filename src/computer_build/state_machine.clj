@@ -1,5 +1,5 @@
-(ns state-machine
-  (:use computer-build.vhdl clojure.contrib.pprint)
+(ns computer-build.state-machine
+  (:use computer-build.vhdl)
   (:refer-clojure :rename {:name :keyword-to-str}))
 
 (defn state-machine [name inputs outputs states transitions]
@@ -20,13 +20,3 @@
                      (case :state
                            "state_on" (<= :bulb "1")))))))
 
-(def my-sm (state-machine "pushbutton" [:push] [:bulb]
-               {:on '(<= :bulb "1") :off '(<= :bulb "0")} ; states
-               [ ; transitions
-                '(:on (= :push "1") :off)
-                '(:off (= :push "0") :on)
-                ]))
-
-(pprint my-sm)
-(println "=================")
-(generate-vhdl my-sm)
