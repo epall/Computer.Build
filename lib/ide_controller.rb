@@ -1,4 +1,4 @@
-require 'state-machine'
+require 'Computer.Build'
 
 
 controller = state_machine "ide_controller" do |m|
