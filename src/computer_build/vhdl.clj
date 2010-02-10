@@ -2,6 +2,12 @@
   (:use clojure.contrib.str-utils))
 
 
+(def std-logic "std_logic")
+
+(defn std-logic-vector [start end]
+  (str "std_logic_vector(" start " downto " end ")"))
+
+
 (defn indented-lines [strings] (map (partial str "  ") strings))
 
 (defn indent-lines [[line & lines]]
