@@ -70,8 +70,8 @@
 (defmethod to-vhdl :<= [[type target expression]]
   (spaces (keyword-to-str target) "<=" (keyword-to-str expression)))
 
-(defmethod to-vhdl :signal [[type name type]]
-  (str "signal " name " : " type ";"))
+(defmethod to-vhdl :signal [[type sig type]]
+  (str "signal " (name sig) " : " type ";"))
 
 (defmethod to-vhdl :deftype [[type name values]]
   (let [valuelist (str-join ", " values)]
