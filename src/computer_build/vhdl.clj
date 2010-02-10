@@ -2,10 +2,10 @@
   (:use clojure.contrib.str-utils))
 
 
-(def std-logic "std_logic")
+(def std-logic "STD_LOGIC")
 
 (defn std-logic-vector [start end]
-  (str "std_logic_vector(" start " downto " end ")"))
+  (str "STD_LOGIC_VECTOR(" start " downto " end ")"))
 
 
 (defn indented-lines [strings] (map (partial str "  ") strings))
@@ -36,17 +36,17 @@
 (defmethod to-vhdl :entity [[type name ports defs & architecture]]
   (apply str (interpose "\n" (indent-lines
   (list
-    (spaces "entity" name "is")
-    "port("
+    (spaces "ENTITY" name "is")
+    "PORT("
     (commaify (map to-vhdl (map (partial cons :port) ports)))
     ");"
-    (str "end " name ";")
+    (str "END " name ";")
 
-    (str "architecture arch_" name " of " name " is")
+    (str "ARCHITECTURE arch_" name " OF " name " IS")
     (map to-vhdl defs)
-    "begin"
+    "BEGIN"
     (with-meta (map to-vhdl architecture) {:noindent true})
-    (str "end arch_" name ";"))))))
+    (str "END arch_" name ";"))))))
 
 ; does not generate lines like block-level methods do
 (defmethod to-vhdl :port [[type id direction type]]
@@ -54,37 +54,37 @@
 
 (defmethod to-vhdl :process [[type ports & definition]]
   (list
-    (str "process(" (str-join "," (map keyword-to-str ports)) ")")
-    "begin"
+    (str "PROCESS(" (str-join "," (map keyword-to-str ports)) ")")
+    "BEGIN"
     (with-meta (map to-vhdl definition) {:noindent true})
-    "end process;"))
+    "END PROCESS;"))
 
 (defmethod to-vhdl :case [[type target & cases]]
   (list
-    (spaces "case" (keyword-to-str target) "is")
-    (map #(str (spaces "when" (quoted-str (first %)) "=>" (to-vhdl (second %))) \;)
+    (spaces "CASE" (keyword-to-str target) "IS")
+    (map #(str (spaces "WHEN" (quoted-str (first %)) "=>" (to-vhdl (second %))) \;)
          (partition 2 cases))
-    "end case;"))
+    "END CASE;"))
 
 ; does not generate lines like block-level methods do
 (defmethod to-vhdl :<= [[type target expression]]
   (spaces (keyword-to-str target) "<=" (keyword-to-str expression)))
 
 (defmethod to-vhdl :signal [[type sig type]]
-  (str "signal " (name sig) " : " type ";"))
+  (str "SIGNAL " (name sig) " : " type ";"))
 
 (defmethod to-vhdl :deftype [[type name values]]
   (let [valuelist (str-join ", " values)]
-    (spaces "type" name "is" "(" valuelist ");")))
+    (spaces "TYPE" name "IS" "(" valuelist ");")))
 
 (defmethod to-vhdl :if [[type condition & body]]
   (list
-    (spaces "if" (to-vhdl condition) "then")
+    (spaces "IF" (to-vhdl condition) "THEN")
     (with-meta (map to-vhdl body) {:noindent true})
-    "end if;"))
+    "END IF;"))
 
 (defmethod to-vhdl :and [[type condA condB]]
-  (spaces (to-vhdl condA) "and" (to-vhdl condB)))
+  (spaces (to-vhdl condA) "AND" (to-vhdl condB)))
 
 (defmethod to-vhdl :event [[type target]]
   (str (keyword-to-str target) "'EVENT"))
@@ -95,6 +95,6 @@
 
 (defn generate-vhdl [& entities]
   (do
-    (println "library ieee;")
-    (println "use ieee.std_logic_1164.all;")
+    (println "LIBRARY ieee;")
+    (println "USE ieee.std_logic_1164.all;")
     (println (to-vhdl (first entities)))))
