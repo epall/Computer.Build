@@ -11,21 +11,13 @@
 (defn state-from-name [statename]
   (keyword (str "state_" (keyword-to-str statename))))
 
-(defn replace-goto [node state-variable]
-  (list '<= state-variable (keyword (str "state_" (keyword-to-str (second node))))))
-
 (defn rewrite-gotos [state-variable block]
   "Given a set of statements, replace all gotos with assignments
   to the appropriate state variable"
-  (let [dz (zip/seq-zip block)]
-    (loop [loc dz]
-      (if (zip/end? loc)
-        (zip/root loc)
-        (recur
-          (zip/next
-            (if (= (zip/node loc) 'goto)
-              (zip/edit (zip/up loc) replace-goto state-variable)
-              loc)))))))
+  (vec (map #(if (= 'goto (first %))
+               (list '<= state-variable (state-from-name (second %)))
+               %)
+            block)))
 
 (defn flatten-states [m]
   (if (empty? m) '()
@@ -52,5 +44,5 @@
           (process (:clock)
                    (if-elsif (= :reset "1")
                              ~(rewrite-gotos :state reset)
-                             (and (event :clock) (= :clock "'1'"))
-                             ((case :state ~@(flatten-states states))))))))
+                             (and (event :clock) (= :clock "1"))
+                             (case :state ~@(flatten-states states)))))))

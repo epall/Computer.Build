@@ -34,8 +34,15 @@
 
 (defn quoted-str [string] (str \" string \"))
 
-(defmulti to-vhdl #(-> % first name keyword))
+(defmulti to-vhdl (fn [block]
+  (if (vector? block) :block
+    (-> block first name keyword))))
+
 (defmethod to-vhdl :default [arg] (str "###UNIMPLEMENTED: " (first arg) "###"))
+
+(defmethod to-vhdl :block [block]
+  (map to-vhdl block))
+
 (defmethod to-vhdl :entity [[type name ports defs & architecture]]
   (apply str (interpose "\n" (indent-lines
   (list
@@ -48,7 +55,7 @@
     (str "ARCHITECTURE arch_" name " OF " name " IS")
     (map to-vhdl defs)
     "BEGIN"
-    (with-meta (map to-vhdl architecture) {:noindent true})
+    (map to-vhdl architecture)
     (str "END arch_" name ";"))))))
 
 ; does not generate lines like block-level methods do
@@ -63,16 +70,15 @@
     "END PROCESS;"))
 
 (defn expand-case [[condition body]]
-  (println body)
-  (list
+  (with-meta (list
     (spaces "WHEN" (keyword-to-str condition) "=>")
-    (map to-vhdl body)))
+    (to-vhdl body)) {:noindent true}))
 
 (defmethod to-vhdl :case [[type target & cases]]
-  (with-meta (list
+  (list
     (spaces "CASE" (keyword-to-str target) "IS")
     (map expand-case (partition 2 cases))
-    "END CASE;") {:noindent true}))
+    "END CASE;"))
 
 ; does not generate lines like block-level methods do
 (defmethod to-vhdl :<= [[type & args]]
@@ -96,28 +102,28 @@
     (spaces "TYPE" name "IS" "(" valuelist ");")))
 
 (defmethod to-vhdl :if [[type condition body]]
-  (list
+  (with-meta (list
     (spaces "IF" (to-vhdl condition) "THEN")
-    (map to-vhdl body)
-    "END IF;"))
+    (to-vhdl body)
+    "END IF;") {:noindent true}))
 
 (defmethod to-vhdl :if-else [[type condition truebody falsebody]]
-  (list
+  (with-meta (list
     (spaces "IF" (to-vhdl condition) "THEN")
-    (map to-vhdl truebody)
+    (to-vhdl truebody)
     "ELSE"
-    (map to-vhdl falsebody)
-    "END IF;"))
+    (to-vhdl falsebody)
+    "END IF;") {:noindent true}))
 
 (defn gen-elsif [[condition body]]
   (with-meta (list
     (spaces "ELSIF" (to-vhdl condition) "THEN")
-    (map to-vhdl body)) {:noindent true}))
+    (to-vhdl body)) {:noindent true}))
 
 (defmethod to-vhdl :if-elsif [[type condition body & clauses]]
   (list
     (spaces "IF" (to-vhdl condition) "THEN")
-    (map to-vhdl body)
+    (to-vhdl body)
     (with-meta
       (map gen-elsif (partition 2 clauses))
       {:noindent true})
@@ -130,7 +136,7 @@
   (str (keyword-to-str target) "'EVENT"))
 
 (defmethod to-vhdl := [[type condA condB]]
-  (spaces (name condA) "=" condB))
+  (spaces (name condA) "=" (keyword-to-str condB)))
 
 
 (defn generate-vhdl [& entities]

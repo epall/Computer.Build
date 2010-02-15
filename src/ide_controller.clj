@@ -34,7 +34,7 @@
                                     :data_buffer (std-logic-vector 15 0)
                                     }
                                    ; reset
-                                   '(
+                                   '[
                                      (goto :wait)
                                      (low :ide_reset_n)
                                      (low :read_instr)
@@ -48,51 +48,51 @@
                                      (<= :result_command "00000000")
                                      (<= :result_status "00000000")
                                      (<= :result_data "0000000000000000")
-                                     )
+                                     ]
                                    ; states
                                    {:wait
-                                    '(
+                                    '[
                                       (high :ide_reset_n)
                                       (low :write_result)
-                                      (<= :read_instr, :available_instr))
+                                      (<= :read_instr, :available_instr)]
                                     :decode
-                                    '(
+                                    '[
                                       (<= :command_buffer :instr_command)
                                       (<= :address_buffer, :instr_address)
                                       (<= :data_buffer, :instr_data)
                                       (low :read_instr)
                                       (case :instr_command
                                             "00000000"
-                                            ((<= :result_command, :instr_command)
+                                            [(<= :result_command, :instr_command)
                                                (<= :result_status, "00000000")
-                                               (<= :result_data, "0000000000000000"))
+                                               (<= :result_data, "0000000000000000")]
                                             "00000011"
-                                            ((<= :result_command, :instr_command)
+                                            [(<= :result_command, :instr_command)
                                                (<= :ide_address 0 :instr_address 0)
                                                (<= :ide_address 1 :instr_address 1)
-                                               (<= :ide_address 2 :instr_address 2))
+                                               (<= :ide_address 2 :instr_address 2)]
                                             "00000010"
-                                            ((<= :result_command, :instr_command)
+                                            [(<= :result_command, :instr_command)
                                                (<= :ide_address 0 :instr_address 0)
                                                (<= :ide_address 1 :instr_address 1)
                                                (<= :ide_address 2 :instr_address 2)
-                                               (low :ide_cs_1f0_n))))
+                                               (low :ide_cs_1f0_n)])]
                                     :writestatus
-                                    '(
+                                    '[
                                      (high :write_result)
                                       (high :ide_cs_1f0_n)
-                                      (high :ide_data_read_n))
+                                      (high :ide_data_read_n)]
                                     :action
-                                    '(
+                                    '[
                                       (if-else (= :instr_command "00000011")
-                                        ((<= :result_data :ide_data_in))
-                                        ((<= :result_data, "0000000000000000")))
-                                      (low :ide_data_OE))
+                                        [(<= :result_data :ide_data_in)]
+                                        [(<= :result_data, "0000000000000000")])
+                                      (low :ide_data_OE)]
                                     :data_on_bus
-                                    '(
+                                    '[
                                       (if (= :command_buffer, "00000011")
-                                        ((high :ide_data_write_n)
-                                        (low :ide_data_read_n))))
+                                        [(high :ide_data_write_n)
+                                        (low :ide_data_read_n)])]
                                     }
                                    ; transitions (from condition to)
                                    [
