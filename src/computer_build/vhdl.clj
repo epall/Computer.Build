@@ -1,12 +1,10 @@
 (ns computer-build.vhdl
   (:use clojure.contrib.str-utils))
 
-
 (def std-logic "STD_LOGIC")
 
 (defn std-logic-vector [start end]
   (str "STD_LOGIC_VECTOR(" start " downto " end ")"))
-
 
 (defn indented-lines [strings] (map (partial str "  ") strings))
 
@@ -20,6 +18,12 @@
               (indented-lines (indent-lines line)))
           (indent-lines lines)))))
 
+(defn flat-list [head & tail]
+  (let [tail (if (empty? tail) '() (apply flat-list tail))]
+    (if (seq? head)
+      (concat head tail)
+      (cons head tail))))
+
 (defn spaces [& strings] (str-join " " strings))
 
 (defn commaify [lines]
@@ -32,11 +36,23 @@
       (str \' sym \')
       (str \" sym \"))))
 
-(defn quoted-str [string] (str \" string \"))
-
 (defmulti to-vhdl (fn [block]
   (if (vector? block) :block
     (-> block first name keyword))))
+
+(defn not-indented [body]
+  (with-meta body {:noindent true}))
+
+; Multi-line statement that causes an extraneous level of nesting in AST
+(defmacro def-vhdl-multiline [kword bindings & body]
+  `(defmethod to-vhdl ~kword [~(vec (concat '[_] bindings))]
+     (not-indented (list
+       ~@body))))
+
+; Inline or single-line statements that don't produce a list of lines
+(defmacro def-vhdl-inline [kword bindings & body]
+  `(defmethod to-vhdl ~kword [~(vec (concat '[_] bindings))]
+     (str ~@body)))
 
 (defmethod to-vhdl :default [arg] (str "###UNIMPLEMENTED: " (first arg) "###"))
 
@@ -58,29 +74,42 @@
     (map to-vhdl architecture)
     (str "END arch_" name ";"))))))
 
-; does not generate lines like block-level methods do
-(defmethod to-vhdl :port [[type id direction type]]
-  (str (keyword-to-str id) ": " (keyword-to-str direction) " " type))
-
-(defmethod to-vhdl :process [[type ports & definition]]
-  (list
+(def-vhdl-multiline :process [ports & definition]
     (str "PROCESS(" (str-join "," (map keyword-to-str ports)) ")")
     "BEGIN"
-    (with-meta (map to-vhdl definition) {:noindent true})
-    "END PROCESS;"))
+    (map to-vhdl definition)
+    "END PROCESS;")
 
-(defn expand-case [[condition body]]
-  (with-meta (list
-    (spaces "WHEN" (keyword-to-str condition) "=>")
-    (to-vhdl body)) {:noindent true}))
-
-(defmethod to-vhdl :case [[type target & cases]]
-  (list
+(def-vhdl-multiline :case [target & cases]
     (spaces "CASE" (keyword-to-str target) "IS")
-    (map expand-case (partition 2 cases))
-    "END CASE;"))
+    (map #(not-indented (list
+      (spaces "WHEN" (keyword-to-str (first %)) "=>")
+      (to-vhdl (second %)))) (partition 2 cases))
+    "END CASE;")
 
-; does not generate lines like block-level methods do
+(def-vhdl-multiline :if [condition body]
+    (spaces "IF" (to-vhdl condition) "THEN")
+    (to-vhdl body)
+    "END IF;")
+
+(def-vhdl-multiline :if-else [condition truebody falsebody]
+    (spaces "IF" (to-vhdl condition) "THEN")
+    (to-vhdl truebody)
+    "ELSE"
+    (to-vhdl falsebody)
+    "END IF;")
+
+(def-vhdl-multiline :if-elsif [condition body & clauses]
+    (spaces "IF" (to-vhdl condition) "THEN")
+    (to-vhdl body)
+    (not-indented
+      (map #(not-indented (list
+        (spaces "ELSIF" (to-vhdl (first %)) "THEN")
+        (to-vhdl (second %)))) (partition 2 clauses)))
+    "END IF;")
+
+; inline / single-line statements
+
 (defmethod to-vhdl :<= [[type & args]]
   (if (= (count args) 2)
     (let [[target expression] args]
@@ -88,56 +117,31 @@
     (let [[target target-index source source-index] args]
       (str (keyword-to-str target) "(" target-index ") <= " (keyword-to-str source) "(" source-index ");"))))
 
-(defmethod to-vhdl :low [[type target]]
+(def-vhdl-inline :port [id direction kind]
+  (keyword-to-str id) ": " (keyword-to-str direction) " " kind)
+
+(def-vhdl-inline :low [target]
   (to-vhdl `(<= ~target "0")))
 
-(defmethod to-vhdl :high [[type target]]
+(def-vhdl-inline :high [target]
   (to-vhdl `(<= ~target "1")))
 
-(defmethod to-vhdl :signal [[type sig type]]
-  (str "SIGNAL " (name sig) " : " type ";"))
+(def-vhdl-inline :signal [sig kind]
+  "SIGNAL " (name sig) " : " kind ";")
 
-(defmethod to-vhdl :deftype [[type name values]]
-  (let [valuelist (str-join ", " values)]
-    (spaces "TYPE" name "IS" "(" valuelist ");")))
+(def-vhdl-inline :deftype [name values]
+  "TYPE " name " IS (" (str-join ", " values) ");")
 
-(defmethod to-vhdl :if [[type condition body]]
-  (with-meta (list
-    (spaces "IF" (to-vhdl condition) "THEN")
-    (to-vhdl body)
-    "END IF;") {:noindent true}))
+(def-vhdl-inline :and [condA condB]
+  (to-vhdl condA) " AND " (to-vhdl condB))
 
-(defmethod to-vhdl :if-else [[type condition truebody falsebody]]
-  (with-meta (list
-    (spaces "IF" (to-vhdl condition) "THEN")
-    (to-vhdl truebody)
-    "ELSE"
-    (to-vhdl falsebody)
-    "END IF;") {:noindent true}))
+(def-vhdl-inline :event [target]
+  (keyword-to-str target) "'EVENT")
 
-(defn gen-elsif [[condition body]]
-  (with-meta (list
-    (spaces "ELSIF" (to-vhdl condition) "THEN")
-    (to-vhdl body)) {:noindent true}))
+(def-vhdl-inline := [condA condB]
+  (name condA) " = " (keyword-to-str condB))
 
-(defmethod to-vhdl :if-elsif [[type condition body & clauses]]
-  (list
-    (spaces "IF" (to-vhdl condition) "THEN")
-    (to-vhdl body)
-    (with-meta
-      (map gen-elsif (partition 2 clauses))
-      {:noindent true})
-    "END IF;"))
-
-(defmethod to-vhdl :and [[type condA condB]]
-  (spaces (to-vhdl condA) "AND" (to-vhdl condB)))
-
-(defmethod to-vhdl :event [[type target]]
-  (str (keyword-to-str target) "'EVENT"))
-
-(defmethod to-vhdl := [[type condA condB]]
-  (spaces (name condA) "=" (keyword-to-str condB)))
-
+;;;;;;;;;;;;;;; Final output generation ;;;;;;;;;;;;;;
 
 (defn generate-vhdl [& entities]
   (do
