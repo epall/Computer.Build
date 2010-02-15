@@ -31,7 +31,7 @@
                                    ; signals
                                    {:command_buffer (std-logic-vector 7 0)
                                     :address_buffer (std-logic-vector 7 0)
-                                    :data_buffer (std-logic-vector 7 0)
+                                    :data_buffer (std-logic-vector 15 0)
                                     }
                                    ; reset
                                    '(
@@ -84,15 +84,16 @@
                                       (high :ide_data_read_n))
                                     :action
                                     '(
-                                      (if (equal :instr_command "00000011")
-                                        (<= :result_data :ide_data_in)
-                                        (<= :result_data, "0000000000000000"))
+                                      (if-else (= :instr_command "00000011")
+                                        ((<= :result_data :ide_data_in))
+                                        ((<= :result_data, "0000000000000000")))
                                       (low :ide_data_OE))
                                     :data_on_bus
                                     '(
-                                      (if (equal :command_buffer, "00000011")
+                                      (if (= :command_buffer, "00000011")
                                         ((high :ide_data_write_n)
-                                        (low :ide_data_read_n))))}
+                                        (low :ide_data_read_n))))
+                                    }
                                    ; transitions (from condition to)
                                    [
                                     '(:wait (equal :available_instr "1") :decode)

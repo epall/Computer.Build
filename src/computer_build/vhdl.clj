@@ -27,7 +27,10 @@
          (partition 2 (concat (interpose ";" lines) [""]))))
 
 (defn keyword-to-str [sym]
-  (if (keyword? sym) (name sym) (str \" sym \")))
+  (if (keyword? sym) (name sym)
+    (if (= (count sym) 1)
+      (str \' sym \')
+      (str \" sym \"))))
 
 (defn quoted-str [string] (str \" string \"))
 
@@ -59,16 +62,31 @@
     (with-meta (map to-vhdl definition) {:noindent true})
     "END PROCESS;"))
 
-(defmethod to-vhdl :case [[type target & cases]]
+(defn expand-case [[condition body]]
+  (println body)
   (list
+    (spaces "WHEN" (keyword-to-str condition) "=>")
+    (map to-vhdl body)))
+
+(defmethod to-vhdl :case [[type target & cases]]
+  (with-meta (list
     (spaces "CASE" (keyword-to-str target) "IS")
-    (map #(str (spaces "WHEN" (quoted-str (first %)) "=>" (to-vhdl (second %))) \;)
-         (partition 2 cases))
-    "END CASE;"))
+    (map expand-case (partition 2 cases))
+    "END CASE;") {:noindent true}))
 
 ; does not generate lines like block-level methods do
-(defmethod to-vhdl :<= [[type target expression]]
-  (spaces (keyword-to-str target) "<=" (keyword-to-str expression)))
+(defmethod to-vhdl :<= [[type & args]]
+  (if (= (count args) 2)
+    (let [[target expression] args]
+      (str (spaces (keyword-to-str target) "<=" (keyword-to-str expression)) \;))
+    (let [[target target-index source source-index] args]
+      (str (keyword-to-str target) "(" target-index ") <= " (keyword-to-str source) "(" source-index ");"))))
+
+(defmethod to-vhdl :low [[type target]]
+  (to-vhdl `(<= ~target "0")))
+
+(defmethod to-vhdl :high [[type target]]
+  (to-vhdl `(<= ~target "1")))
 
 (defmethod to-vhdl :signal [[type sig type]]
   (str "SIGNAL " (name sig) " : " type ";"))
@@ -77,10 +95,32 @@
   (let [valuelist (str-join ", " values)]
     (spaces "TYPE" name "IS" "(" valuelist ");")))
 
-(defmethod to-vhdl :if [[type condition & body]]
+(defmethod to-vhdl :if [[type condition body]]
   (list
     (spaces "IF" (to-vhdl condition) "THEN")
-    (with-meta (map to-vhdl body) {:noindent true})
+    (map to-vhdl body)
+    "END IF;"))
+
+(defmethod to-vhdl :if-else [[type condition truebody falsebody]]
+  (list
+    (spaces "IF" (to-vhdl condition) "THEN")
+    (map to-vhdl truebody)
+    "ELSE"
+    (map to-vhdl falsebody)
+    "END IF;"))
+
+(defn gen-elsif [[condition body]]
+  (with-meta (list
+    (spaces "ELSIF" (to-vhdl condition) "THEN")
+    (map to-vhdl body)) {:noindent true}))
+
+(defmethod to-vhdl :if-elsif [[type condition body & clauses]]
+  (list
+    (spaces "IF" (to-vhdl condition) "THEN")
+    (map to-vhdl body)
+    (with-meta
+      (map gen-elsif (partition 2 clauses))
+      {:noindent true})
     "END IF;"))
 
 (defmethod to-vhdl :and [[type condA condB]]
