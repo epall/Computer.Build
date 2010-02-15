@@ -74,10 +74,10 @@
     (map to-vhdl architecture)
     (str "END arch_" name ";"))))))
 
-(def-vhdl-multiline :process [ports & definition]
+(def-vhdl-multiline :process [ports definition]
     (str "PROCESS(" (str-join "," (map keyword-to-str ports)) ")")
     "BEGIN"
-    (map to-vhdl definition)
+    (to-vhdl definition)
     "END PROCESS;")
 
 (def-vhdl-multiline :case [target & cases]

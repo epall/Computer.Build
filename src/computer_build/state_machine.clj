@@ -24,8 +24,13 @@
     (let [[state body] (first m)]
       (list* (state-from-name state) body (flatten-states (dissoc m state))))))
 
-(defn translate-states [states]
-  (map (fn [state] [(first state)]) states))
+(defn translate-transition [state-variable transition]
+  (if (= (count transition) 2)
+  `(if (= ~state-variable ~(state-from-name (first transition)))
+     [(<= ~state-variable ~(state-from-name (last transition)))])
+  `(if (and (= ~state-variable ~(state-from-name (first transition)))
+            ~(second transition))
+     [(<= ~state-variable ~(state-from-name (last transition)))])))
 
 (defn state-machine [name inputs outputs signals reset states transitions]
 	"Create a state machine that operates from the given inputs, triggering
@@ -42,7 +47,8 @@
           ~@(map #(cons 'signal %) signals))
           ; Behavior
           (process (:clock)
-                   (if-elsif (= :reset "1")
+                   [(if-elsif (= :reset "1")
                              ~(rewrite-gotos :state reset)
                              (and (event :clock) (= :clock "1"))
-                             [(case :state ~@(flatten-states states))])))))
+                             [(case :state ~@(flatten-states states))])
+                    ~@(map (partial translate-transition :state) transitions)]))))

@@ -96,16 +96,13 @@
                                     }
                                    ; transitions (from condition to)
                                    [
-                                    '(:wait (equal :available_instr "1") :decode)
-                                    '(:decode (equal :instr_command "00000000") :writestatus)
-                                    '(:decode (equal :instr_command "00000011") :data_on_bus)
-                                    '(:decode (equal :instr_command "00000010") :data_on_bus)
+                                    '(:wait (= :available_instr "1") :decode)
+                                    '(:decode (= :instr_command "00000000") :writestatus)
+                                    '(:decode (= :instr_command "00000011") :data_on_bus)
+                                    '(:decode (= :instr_command "00000010") :data_on_bus)
                                     '(:writestatus :wait)
                                     '(:action :writestatus)
-                                    '(:data_on_bus (equal :command_buffer, "00000011") :action)
+                                    '(:data_on_bus (= :command_buffer, "00000011") :action)
                                     ]))
 
-(pprint ide-controller)
-(println "=================")
 (generate-vhdl ide-controller)
-
