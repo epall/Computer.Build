@@ -16,9 +16,9 @@ ENTITY alu IS
 END alu;
 
 ARCHITECTURE arch OF alu IS
-  SIGNAL operand_a : SIGNED;
-  SIGNAL operand_b : SIGNED;
-  SIGNAL result    : SIGNED;
+  SIGNAL operand_a : SIGNED(DATA_WIDTH-1 downto 0);
+  SIGNAL operand_b : SIGNED(DATA_WIDTH-1 downto 0);
+  SIGNAL result    : SIGNED(DATA_WIDTH-1 downto 0);
 BEGIN
   PROCESS(write_f)
   BEGIN
@@ -62,12 +62,6 @@ BEGIN
         operand_a <= signed(data_in);
       ELSIF ld_b = '1' THEN
         operand_b <= signed(data_in);
-      END IF;
-    ELSIF clock'EVENT AND clock='1' THEN
-      IF write_f = '1' THEN
-        data_out <= std_logic_vector(result);
-      ELSE
-        data_out <= "00000000";
       END IF;
     END IF;
   END PROCESS;
