@@ -25,7 +25,7 @@ BEGIN
   IF rd = '1' THEN
     data_out <= regval;
   ELSE
-    data_out <= "00000000";
+    data_out <= "ZZZZZZZZ";
   END IF;
 
   IF (clock'event AND clock = '0' AND wr = '1') THEN

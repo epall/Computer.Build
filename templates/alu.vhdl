@@ -25,7 +25,7 @@ BEGIN
     IF write_f = '1' THEN
       data_out <= std_logic_vector(result);
     ELSE
-      data_out <= "00000000";
+      data_out <= "ZZZZZZZZ";
     END IF;
   END PROCESS;
 
