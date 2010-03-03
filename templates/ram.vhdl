@@ -14,7 +14,8 @@ ENTITY ram IS
     data_in  : IN  std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     data_out : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     address  : IN  std_logic_vector(ADDRESS_WIDTH - 1 DOWNTO 0);
-    wr       : IN  std_logic;
+    wr_data  : IN  std_logic;
+    wr_addr  : IN  std_logic;
     rd       : IN  std_logic
 );
 END ram;

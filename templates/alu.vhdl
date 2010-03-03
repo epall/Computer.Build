@@ -5,13 +5,13 @@ USE ieee.numeric_std.all;
 ENTITY alu IS
   GENERIC ( DATA_WIDTH : integer := 8 );
   PORT(
+  clock     : IN std_logic;
   data_in   : IN std_logic_vector(DATA_WIDTH - 1 downto 0);
   data_out  : OUT std_logic_vector(DATA_WIDTH - 1 downto 0);
   op        : IN std_logic_vector(2 downto 0);
-  clock     : IN std_logic;
-  ld_a      : IN std_logic;
-  ld_b      : IN std_logic;
-  write_f   : IN std_logic
+  wr_a      : IN std_logic;
+  wr_b      : IN std_logic;
+  rd        : IN std_logic
       );
 END alu;
 
