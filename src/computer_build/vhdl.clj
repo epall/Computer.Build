@@ -108,6 +108,13 @@
         (to-vhdl (second %)))) (partition 2 clauses)))
     "END IF;")
 
+(def-vhdl-multiline :component [name & ports]
+  (str "COMPONENT " (keyword-to-str name))
+  "PORT("
+  (commaify (map to-vhdl (map (partial cons :port) ports)))
+  ");"
+  (str "END COMPONENT;"))
+  
 ; inline / single-line statements
 
 (defmethod to-vhdl :<= [[type & args]]
@@ -119,6 +126,9 @@
 
 (def-vhdl-inline :port [id direction kind]
   (keyword-to-str id) ": " (keyword-to-str direction) " " kind)
+
+(def-vhdl-inline :instance [component name & mappings]
+  name ": " (keyword-to-str component) " PORT MAP(" (str-join ", " (map keyword-to-str mappings)) ");")
 
 (def-vhdl-inline :low [target]
   (to-vhdl `(<= ~target "0")))
