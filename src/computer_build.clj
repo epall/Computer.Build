@@ -13,7 +13,7 @@
 (def static-states {
   :fetch {:control-signals '(:rd_pc, :wr_addr), :next :store_instruction}
   :store_instruction {:control-signals '(:rd_ram, :wr_ir), :next :decode}
-  ;:decode {:control-signals '(:rd_ir)}
+  :decode {:control-signals '()}
 })
 
 (defn flatten-1 [things]
@@ -73,7 +73,7 @@
 (defn control-unit [instructions]
   "Given a set of states, make a control unit that will
   execute them"
-  (let [states (make-states instructions)
+  (let [states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map (fn [[_ body]] (:control-signals body)) states)))
         opcodes (make-opcodes instructions)]
     (defn realize-state [state]
@@ -88,15 +88,17 @@
                    ; outputs
                    (zipmap control-signals (repeat (count control-signals) std-logic))
                    ; signals
-                   {
-                    :ir (std-logic-vector (- (count (second (first opcodes))) 1) 0)
-                    }
+                   { :opcode (std-logic-vector (- (count (second (first opcodes))) 1) 0) }
                    ; reset
                    (vec (map #(list 'low %) control-signals))
                    ; states
                    (mapmap realize-state states)
                    ; transitions
-                   []
+                   (concat
+                     ; states
+                     (map #(list (first %) (:next (second %))) states)
+                     ; decode
+                     (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes))
                    )))
 
 (defn build* [cpuname instructions]
