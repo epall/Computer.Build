@@ -38,7 +38,7 @@
 	the signals in the outputs array"
   (let [inports (reformat-ports inputs :in)
         outports (reformat-ports outputs :out)]
-	`(entity ~(gensym name)
+	`(entity ~name
           ; Ports
           ~(concat ['(:clock :in "std_logic")] inports outports)
           ; Definitions
