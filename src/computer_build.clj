@@ -104,7 +104,10 @@
 (defn build* [cpuname instructions]
   (.mkdir (java.io.File. cpuname))
   (let [states (merge static-states (make-states instructions))]
-    (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))]
+    (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))
+                control-vhdl (java.io.FileWriter. (str cpuname "/control.vhdl"))]
+      (binding [*out* control-vhdl]
+        (generate-vhdl (control-unit instructions)))
       (binding [*out* main-vhdl]
         (generate-vhdl `(entity "main"
           ; ports
