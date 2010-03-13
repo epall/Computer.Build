@@ -6,6 +6,12 @@
 (defn std-logic-vector [start end]
   (str "STD_LOGIC_VECTOR(" start " downto " end ")"))
 
+(defn input [[id kind]]
+  (list id :in kind))
+
+(defn output [[id kind]]
+  (list id :out kind))
+
 (defn indented-lines [strings] (map (partial str "  ") strings))
 
 (defn indent-lines [[line & lines]]

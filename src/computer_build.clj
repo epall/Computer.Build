@@ -75,22 +75,22 @@
   execute them"
   (let [states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map (fn [[_ body]] (:control-signals body)) states)))
-        opcodes (make-opcodes instructions)]
+        opcodes (make-opcodes instructions)
+        inputs {:reset std-logic :bus_in (std-logic-vector 7 0)}
+        outputs (zipmap control-signals (repeat (count control-signals) std-logic))]
     (defn realize-state [state]
       (let [highs (:control-signals state)]
         (vec (concat (map #(list 'high %) highs) (map #(list 'low %) (difference control-signals highs))))))
 
-    (state-machine "control_unit"
+    (list (state-machine "control_unit"
                    ; inputs
-                   {:reset std-logic
-                    :bus_in (std-logic-vector 7 0)
-                    }
+                   inputs
                    ; outputs
-                   (zipmap control-signals (repeat (count control-signals) std-logic))
+                   outputs
                    ; signals
                    { :opcode (std-logic-vector (- (count (second (first opcodes))) 1) 0) }
                    ; reset
-                   (vec (map #(list 'low %) control-signals))
+                   (list* '(goto :fetch) (map #(list 'low %) control-signals))
                    ; states
                    (mapmap realize-state states)
                    ; transitions
@@ -99,15 +99,16 @@
                      (map #(list (first %) (:next (second %))) states)
                      ; decode
                      (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes))
-                   )))
+                   ) inputs outputs)))
 
 (defn build* [cpuname instructions]
   (.mkdir (java.io.File. cpuname))
-  (let [states (merge static-states (make-states instructions))]
+  (let [states (merge static-states (make-states instructions))
+        [control-unit control-in control-out] (control-unit instructions)]
     (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))
                 control-vhdl (java.io.FileWriter. (str cpuname "/control.vhdl"))]
       (binding [*out* control-vhdl]
-        (generate-vhdl (control-unit instructions)))
+        (generate-vhdl control-unit))
       (binding [*out* main-vhdl]
         (generate-vhdl `(entity "main"
           ; ports
@@ -117,8 +118,8 @@
           (signal :alu_op ~(std-logic-vector 2 0))
           (signal :wr_pc ~std-logic)
           (signal :rd_pc ~std-logic)
-          (signal :wr_ir ~std-logic)
-          (signal :rd_ir ~std-logic)
+          (signal :wr_IR ~std-logic)
+          (signal :rd_IR ~std-logic)
           (signal :wr_addr ~std-logic)
           (signal :wr_ram ~std-logic)
           (signal :rd_ram ~std-logic)
@@ -145,20 +146,24 @@
             (:wr :in ~std-logic)
             (:rd :in ~std-logic))
 
-            (component :alu
-              (:clock :in ~std-logic)
-              (:data_in :in ~(std-logic-vector 7 0))
-              (:data_out :out ~(std-logic-vector 7 0))
-              (:op :in ~(std-logic-vector 2 0))
-              (:wr_a :in ~std-logic)
-              (:wr_b :in ~std-logic)
-              (:rd :in ~std-logic))
+          (component :alu
+            (:clock :in ~std-logic)
+            (:data_in :in ~(std-logic-vector 7 0))
+            (:data_out :out ~(std-logic-vector 7 0))
+            (:op :in ~(std-logic-vector 2 0))
+            (:wr_a :in ~std-logic)
+            (:wr_b :in ~std-logic)
+            (:rd :in ~std-logic))
+
+          (component :control
+            ~@(list* `(:clock :in ~std-logic) (concat (map input control-in) (map output control-out))))
             ]
           ; architecture
           [
           (instance :reg "pc" :clock :system_bus :system_bus :wr_pc :rd_pc)   ; program counter
-          (instance :reg "ir" :clock :system_bus :system_bus :wr_ir :rd_ir)   ; instruction register
+          (instance :reg "ir" :clock :system_bus :system_bus :wr_IR :rd_IR)   ; instruction register
           (instance :reg "A" :clock :system_bus :system_bus :wr_A :rd_A)      ; accumulator
           (instance :ram "main_memory" :clock :system_bus :system_bus :system_bus :wr_ram :wr_addr :rd_ram)
           (instance :alu "alu" :clock :system_bus :system_bus :alu_op :wr_alu_a :wr_alu_b :rd_alu)
+          (instance :control "control" ~@(list* :clock (concat (map first control-in) (map first control-out))))
           ]))))))
