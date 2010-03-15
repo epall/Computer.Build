@@ -6,6 +6,9 @@
 (defn std-logic-vector [start end]
   (str "STD_LOGIC_VECTOR(" start " downto " end ")"))
 
+(defn subbits [k start end]
+  (keyword (str (name k) "(" start " downto " end ")")))
+
 (defn input [[id kind]]
   (list id :in kind))
 

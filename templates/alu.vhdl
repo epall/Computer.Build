@@ -20,9 +20,9 @@ ARCHITECTURE arch OF alu IS
   SIGNAL operand_b : SIGNED(DATA_WIDTH-1 downto 0);
   SIGNAL result    : SIGNED(DATA_WIDTH-1 downto 0);
 BEGIN
-  PROCESS(write_f)
+  PROCESS(rd)
   BEGIN
-    IF write_f = '1' THEN
+    IF rd = '1' THEN
       data_out <= std_logic_vector(result);
     ELSE
       data_out <= "ZZZZZZZZ";
@@ -58,9 +58,9 @@ BEGIN
   PROCESS(clock)
   BEGIN
     IF clock'EVENT AND clock='0' THEN
-      IF ld_a = '1' THEN
+      IF wr_a = '1' THEN
         operand_a <= signed(data_in);
-      ELSIF ld_b = '1' THEN
+      ELSIF wr_b = '1' THEN
         operand_b <= signed(data_in);
       END IF;
     END IF;

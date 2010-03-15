@@ -2,6 +2,8 @@
 
 ; RTL-level description
 (computer-build/build "mccalla"
+  ; options
+  {:address-width 4}
   (instruction "cla"
                (A <- 0))
   (instruction "cmp"

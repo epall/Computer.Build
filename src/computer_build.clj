@@ -1,8 +1,8 @@
 (ns computer-build
   (:use computer-build.vhdl computer-build.state-machine clojure.set))
 
-(defmacro build [cpuname & instructions]
-  `(build* ~cpuname (quote ~instructions)))
+(defmacro build [cpuname options & instructions]
+  `(build* ~cpuname ~options (quote ~instructions)))
 
 (defn rd [port]
   (keyword (str "rd_" (name port))))
@@ -11,8 +11,8 @@
   (keyword (str "wr_" (name port))))
 
 (def static-states {
-  :fetch {:control-signals '(:rd_pc, :wr_addr), :next :store_instruction}
-  :store_instruction {:control-signals '(:rd_ram, :wr_ir), :next :decode}
+  :fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
+  :store_instruction {:control-signals '(:rd_MD, :wr_ir), :next :decode}
   :decode {:control-signals '()}
 })
 
@@ -76,7 +76,7 @@
   (let [states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map (fn [[_ body]] (:control-signals body)) states)))
         opcodes (make-opcodes instructions)
-        inputs {:reset std-logic :bus_in (std-logic-vector 7 0)}
+        inputs {:reset std-logic :system_bus (std-logic-vector 7 0)}
         outputs (zipmap control-signals (repeat (count control-signals) std-logic))]
     (defn realize-state [state]
       (let [highs (:control-signals state)]
@@ -96,12 +96,12 @@
                    ; transitions
                    (concat
                      ; states
-                     (map #(list (first %) (:next (second %))) states)
+                     (map #(list (first %) (:next (second %))) (dissoc states :decode))
                      ; decode
                      (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes))
-                   ) inputs outputs)))
+                   ) (assoc inputs :clock std-logic) outputs)))
 
-(defn build* [cpuname instructions]
+(defn build* [cpuname options instructions]
   (.mkdir (java.io.File. cpuname))
   (let [states (merge static-states (make-states instructions))
         [control-unit control-in control-out] (control-unit instructions)]
@@ -112,7 +112,9 @@
       (binding [*out* main-vhdl]
         (generate-vhdl `(entity "main"
           ; ports
-          [(:clock :in ~std-logic)]
+          [(:clock :in ~std-logic)
+           (:reset :in ~std-logic)
+           (:bus_inspection :out ~(std-logic-vector 7 0))]
           ; defs
           [(signal :system_bus ~(std-logic-vector 7 0))
           (signal :alu_op ~(std-logic-vector 2 0))
@@ -120,9 +122,9 @@
           (signal :rd_pc ~std-logic)
           (signal :wr_IR ~std-logic)
           (signal :rd_IR ~std-logic)
-          (signal :wr_addr ~std-logic)
-          (signal :wr_ram ~std-logic)
-          (signal :rd_ram ~std-logic)
+          (signal :wr_MA ~std-logic)
+          (signal :wr_MD ~std-logic)
+          (signal :rd_MD ~std-logic)
           (signal :wr_A ~std-logic)
           (signal :rd_A ~std-logic)
           (signal :wr_B ~std-logic)
@@ -142,8 +144,9 @@
             (:clock :in ~std-logic)
             (:data_in :in ~(std-logic-vector 7 0))
             (:data_out :out ~(std-logic-vector 7 0))
-            (:address :out ~(std-logic-vector 3 0))
-            (:wr :in ~std-logic)
+            (:address :in ~(std-logic-vector 3 0))
+            (:wr_data :in ~std-logic)
+            (:wr_addr :in ~std-logic)
             (:rd :in ~std-logic))
 
           (component :alu
@@ -155,15 +158,16 @@
             (:wr_b :in ~std-logic)
             (:rd :in ~std-logic))
 
-          (component :control
-            ~@(list* `(:clock :in ~std-logic) (concat (map input control-in) (map output control-out))))
+          (component :control_unit
+            ~@(concat (map input control-in) (map output control-out)))
             ]
           ; architecture
           [
           (instance :reg "pc" :clock :system_bus :system_bus :wr_pc :rd_pc)   ; program counter
           (instance :reg "ir" :clock :system_bus :system_bus :wr_IR :rd_IR)   ; instruction register
           (instance :reg "A" :clock :system_bus :system_bus :wr_A :rd_A)      ; accumulator
-          (instance :ram "main_memory" :clock :system_bus :system_bus :system_bus :wr_ram :wr_addr :rd_ram)
-          (instance :alu "alu" :clock :system_bus :system_bus :alu_op :wr_alu_a :wr_alu_b :rd_alu)
-          (instance :control "control" ~@(list* :clock (concat (map first control-in) (map first control-out))))
+          (instance :ram "main_memory" :clock :system_bus :system_bus ~(subbits :system_bus 7 4) :wr_MD :wr_MA :rd_MD)
+          (instance :alu "alu0" :clock :system_bus :system_bus :alu_op :wr_alu_a :wr_alu_b :rd_alu)
+          (instance :control_unit "control0" ~@(map first (concat control-in control-out)))
+          (<= :bus_inspection :system_bus)
           ]))))))
