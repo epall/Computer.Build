@@ -12,7 +12,7 @@
 
 (def static-states {
   :fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
-  :store_instruction {:control-signals '(:rd_MD, :wr_ir), :next :decode}
+  :store_instruction {:control-signals '(:rd_MD, :wr_IR), :next :decode}
   :decode {:control-signals '()}
 })
 
@@ -81,6 +81,9 @@
     (defn realize-state [state]
       (let [highs (:control-signals state)]
         (vec (concat (map #(list 'high %) highs) (map #(list 'low %) (difference control-signals highs))))))
+    (defn tweak-instruction-fetch [body]
+      ; FIXME hard-coded
+      (vec (list* '(<= :opcode "2 downto 0" :system_bus "7 downto 5") body)))
 
     (list (state-machine "control_unit"
                    ; inputs
@@ -92,7 +95,9 @@
                    ; reset
                    (list* '(goto :fetch) (map #(list 'low %) control-signals))
                    ; states
-                   (mapmap realize-state states)
+                   (let [realized-states (mapmap realize-state states)] realized-states
+                         (assoc realized-states :store_instruction 
+                          (tweak-instruction-fetch (:store_instruction realized-states))))
                    ; transitions
                    (concat
                      ; states
@@ -118,6 +123,7 @@
           ; defs
           [(signal :system_bus ~(std-logic-vector 7 0))
           (signal :alu_op ~(std-logic-vector 2 0))
+          (signal :opcode ~(std-logic-vector 7 5))
           (signal :wr_pc ~std-logic)
           (signal :rd_pc ~std-logic)
           (signal :wr_IR ~std-logic)
