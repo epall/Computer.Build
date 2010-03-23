@@ -11,7 +11,7 @@ ENTITY reg IS
   (
     clock        : IN  std_logic;
     data_in      : IN  std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
-    data_out      : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
+    data_out     : OUT std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
     wr           : IN  std_logic;
     rd           : IN  std_logic
   );
@@ -22,10 +22,12 @@ ARCHITECTURE rtl OF reg IS
 BEGIN
   PROCESS (clock)
   BEGIN
-  IF rd = '1' THEN
-    data_out <= regval;
-  ELSE
-    data_out <= "ZZZZZZZZ";
+  IF clock'EVENT AND clock = '1' THEN
+    IF rd = '1' THEN
+      data_out <= regval;
+    ELSE
+      data_out <= "ZZZZZZZZ";
+    END IF;
   END IF;
 
   IF (clock'event AND clock = '0' AND wr = '1') THEN

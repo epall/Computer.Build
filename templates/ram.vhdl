@@ -28,13 +28,15 @@ ARCHITECTURE rtl OF ram IS
 BEGIN
   PROCESS (clock)
   BEGIN
-      IF (rd = '1') THEN
-        data_out <= ram_block(to_integer(unsigned(addr_cache)));
-      ELSE
-        data_out <= "ZZZZZZZZ";
+      IF clock'EVENT AND clock = '1' THEN
+        IF rd = '1' THEN
+          data_out <= ram_block(to_integer(unsigned(addr_cache)));
+        ELSE
+          data_out <= "ZZZZZZZZ";
+        END IF;
       END IF;
 
-    IF (clock'EVENT AND clock = '0' AND wr_data = '1') THEN
+    IF clock'EVENT AND clock = '0' THEN
       IF(wr_data = '1') THEN
         ram_block(to_integer(unsigned(addr_cache))) <= data_in;
       ELSIF(wr_addr = '1') THEN

@@ -50,5 +50,6 @@
                    [(if-elsif (= :reset "1")
                              ~(rewrite-gotos :state reset)
                              (and (event :clock) (= :clock "1"))
-                             [(case :state ~@(flatten-states states))])
-                    ~@(map (partial translate-transition :state) transitions)]))))
+                             [(case :state ~@(flatten-states states))
+                              ~@(map (partial translate-transition :state) transitions)])
+                    ]))))
