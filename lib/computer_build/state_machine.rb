@@ -32,6 +32,8 @@ module ComputerBuild
       @inputs = {}
       @outputs = {}
       @signals = []
+      @states = []
+      @transitions = []
       body[self]
     end
 
@@ -56,7 +58,6 @@ module ComputerBuild
     end
 
     def state(name, &body)
-      @states ||= []
       @states << State.new(name, body)
     end
 
@@ -65,7 +66,6 @@ module ComputerBuild
     end
 
     def transition(options)
-      @transitions ||= []
       @transitions << Transition.new(options)
     end
 
