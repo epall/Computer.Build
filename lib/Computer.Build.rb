@@ -81,7 +81,11 @@ class Computer
     end
     
     def move(target, source)
-      @steps << [target, source]
+      @steps << RTL.new(target, source)
+    end
+
+    def microcode
+      steps.map &:to_microcode
     end
   end
   
@@ -96,6 +100,49 @@ class Computer
 
   private
 
+  class RTL
+    def initialize(target, source)
+      @target = target
+      @source = source
+    end
+    
+    def to_microcode
+      if @source.is_a? Fixnum
+        return MicrocodeState.new do |state|
+          state.control_signals = "wr_#{@target}"
+          state.constant_value = @source
+        end
+      elsif @source.is_a? Symbol
+        return MicrocodeState.new do |state|
+          state.control_signals = ["wr_#{@target}", "rd_#{@source}"]
+        end
+      elsif @source.is_a? ALUOperation
+        steps = []
+        steps << MicrocodeState.new do |state|
+          state.control_signals = ["rd_#{@source.operands.first}", "wr_alu_a"]
+          state.alu_op = @source.op
+        end
+
+        if @source.operands.length == 2
+          steps << MicrocodeState.new do |state|
+            state.control_signals = ["wr_alu_b"]
+            if @source.operands.last.is_a? Fixnum
+              state.constant_value = @source.operands.last
+            else
+              state.control_signals << "rd_#{@source.operands.last}"
+            end
+          end
+        end
+
+        steps << MicrocodeState.new do |state|
+          state.control_signals = ["rd_alu", "wr_#{@target}"]
+          state.alu_op = @source.op
+        end
+        return steps
+      end
+    end
+  end
+
   class MicrocodeState
     attr_accessor :control_signals, :alu_op, :constant_value, :next
     def initialize(&blk)
@@ -103,47 +150,10 @@ class Computer
     end
   end
 
-  def rtl_to_microcode(target, source)
-    if source.is_a? Fixnum
-      return MicrocodeState.new do |state|
-        state.control_signals = "wr_#{target}"
-        state.constant_value = source
-      end
-    elsif source.is_a? Symbol
-      return MicrocodeState.new do |state|
-        state.control_signals = ["wr_#{target}", "rd_#{source}"]
-      end
-    elsif source.is_a? ALUOperation
-      steps = []
-      steps << MicrocodeState.new do |state|
-        state.control_signals = ["rd_#{source.operands.first}", "wr_alu_a"]
-        state.alu_op = source.op
-      end
-
-      if source.operands.length == 2
-        steps << MicrocodeState.new do |state|
-          state.control_signals = ["wr_alu_b"]
-          if source.operands.last.is_a? Fixnum
-            state.constant_value = source.operands.last
-          else
-            state.control_signals << "rd_#{source.operands.last}"
-          end
-        end
-      end
-
-      steps << MicrocodeState.new do |state|
-        state.control_signals = ["rd_alu", "wr_#{target}"]
-        state.alu_op = source.op
-      end
-      return steps
-    end
-  end
-
   def make_states(instructions)
     states = {}
     instructions.each do |instr|
-      steps = instr.steps.map {|s| rtl_to_microcode(*s)}
-      steps.flatten!
+      steps = instr.microcode.flatten
       steps.each_with_index do |step, index|
         if index + 1 < steps.length
           step.next = instr.name+"_"+(index+1).to_s
