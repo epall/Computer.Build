@@ -33,16 +33,16 @@ module VHDL
     end
 
     # Default generate, generally overridden
-    def generate(indent)
-      @statements.each {|s| s.generate(indent + 1)}
+    def generate(out, indent)
+      @statements.each {|s| s.generate(out, indent + 1)}
     end
   end
 
   class SingleLineStatement
-    def generate(indent)
-      print "  " * indent
-      print self.line()
-      print "\n"
+    def generate(out, indent)
+      out.print "  " * indent
+      out.print self.line()
+      out.print "\n"
     end
   end
   
@@ -92,20 +92,20 @@ module VHDL
       @types << Type.new(*args)
     end
 
-    def generate
-      puts "ENTITY #{@name} IS"
-      puts "PORT("
+    def generate(out=$stdout)
+      out.puts "ENTITY #{@name} IS"
+      out.puts "PORT("
       @ports.each_with_index do |port, index|
-        port.generate 1, (index == @ports.length-1)
+        port.generate(out, 1, (index == @ports.length-1))
       end
-      puts ");"
-      puts "END #{@name};"
-      puts "ARCHITECTURE arch_#{@name} OF #{@name} IS"
-      @types.each {|t| t.generate 1}
-      @signals.each {|t| t.generate 1}
-      puts "BEGIN"
-      @behavior.generate 1
-      puts "END arch_#{@name};"
+      out.puts ");"
+      out.puts "END #{@name};"
+      out.puts "ARCHITECTURE arch_#{@name} OF #{@name} IS"
+      @types.each {|t| t.generate(out, 1)}
+      @signals.each {|t| t.generate(out, 1)}
+      out.puts "BEGIN"
+      @behavior.generate(out, 1)
+      out.puts "END arch_#{@name};"
     end
   end
 
@@ -127,10 +127,10 @@ module VHDL
       @description = description
     end
     
-    def generate(indent, last)
-      print "  " * indent
-      print "#{@id}: #{@direction} #{@description}"
-      puts last ? '' : ';'
+    def generate(out, indent, last)
+      out.print "  " * indent
+      out.print "#{@id}: #{@direction} #{@description}"
+      out.puts last ? '' : ';'
     end
   end
 
@@ -155,8 +155,8 @@ module VHDL
       @definition << VHDL::Process.new(inputs, body)
     end
     
-    def generate(indent)
-      @definition.each {|d| d.generate(indent+1) }
+    def generate(out, indent)
+      @definition.each {|d| d.generate(out, indent+1) }
     end
   end
 
@@ -168,13 +168,13 @@ module VHDL
       body[self]
     end
 
-    def generate(indent)
+    def generate(out, indent)
       prefix = "  " * indent
       args = @inputs.map(&:to_s).join(',')
-      puts prefix + "PROCESS(#{args})"
-      puts prefix + "BEGIN"
-      @statements.each {|s| s.generate(indent + 1)}
-      puts prefix + "END PROCESS;"
+      out.puts prefix + "PROCESS(#{args})"
+      out.puts prefix + "BEGIN"
+      @statements.each {|s| s.generate(out, indent + 1)}
+      out.puts prefix + "END PROCESS;"
     end
   end
 
@@ -185,28 +185,28 @@ module VHDL
       body.call(@conditions)
     end
 
-    def generate(indent)
+    def generate(out, indent)
       prefix = "  " * indent
-      puts prefix+"CASE #{@input} IS"
+      out.puts prefix+"CASE #{@input} IS"
       @conditions.each do |pair|
         condition, expression = pair
-        print prefix+"  WHEN "
+        out.print prefix+"  WHEN "
         if condition =~ /^\d$/
-          print "'#{condition}'"
+          out.print "'#{condition}'"
         elsif condition =~ /^\d+$/
-          print "\"#{condition}\""
+          out.print "\"#{condition}\""
         else
-          print condition
+          out.print condition
         end
-        print " =>"
+        out.print " =>"
         if expression.is_a? InlineStatement
-          puts expression.generate
+          out.puts expression.generate
         else
-          puts
-          expression.generate(indent+1)
+          out.puts
+          expression.generate(out, indent+1)
         end
       end
-      puts prefix+"END CASE;"
+      out.puts prefix+"END CASE;"
     end
   end
 
@@ -239,29 +239,29 @@ module VHDL
       body.call(self)
     end
 
-    def generate(indent)
+    def generate(out, indent)
       if @compound
         conditions = @conditions.first.map(&:generate).join(' and ')
-        puts ("  "*indent)+"IF #{conditions} THEN"
-        @clauses.first.each {|s| s.generate(indent+1)}
+        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        @clauses.first.each {|s| s.generate(out, indent+1)}
         @clauses[1..100].zip(@conditions[1..100]).each do |statements, conditions|
           conditions = conditions.map(&:generate).join(' and ')
-          puts ("  "*indent)+"ELSIF #{conditions} THEN"
-          statements.each {|s| s.generate(indent+1)}
+          out.puts(("  "*indent)+"ELSIF #{conditions} THEN")
+          statements.each {|s| s.generate(out, indent+1)}
         end
-        puts ("  "*indent)+"END IF;"
+        out.puts(("  "*indent)+"END IF;")
       elsif @whentrue
         conditions = @conditions.map(&:generate).join(' and ')
-        puts ("  "*indent)+"IF #{conditions} THEN"
-        @whentrue.each {|s| s.generate(indent+1)}
-        puts ("  "*indent)+"ELSE"
-        @statements.each {|s| s.generate(indent+1)}
-        puts ("  "*indent)+"END IF;"
+        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        @whentrue.each {|s| s.generate(out, indent+1)}
+        out.puts(("  "*indent)+"ELSE")
+        @statements.each {|s| s.generate(out, indent+1)}
+        out.puts(("  "*indent)+"END IF;")
       else
         conditions = @conditions.map(&:generate).join(' and ')
-        puts ("  "*indent)+"IF #{conditions} THEN"
-        @statements.each {|s| s.generate(indent+1)}
-        puts ("  "*indent)+"END IF;"
+        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        @statements.each {|s| s.generate(out, indent+1)}
+        out.puts(("  "*indent)+"END IF;")
       end
     end
   end
@@ -361,8 +361,8 @@ class Symbol
   end
 end
 
-def generate_vhdl(entity)
-  puts "LIBRARY ieee;"
-  puts "USE ieee.std_logic_1164.all;"
-  entity.generate
+def generate_vhdl(entity, out=$stdout)
+  out.puts "LIBRARY ieee;"
+  out.puts "USE ieee.std_logic_1164.all;"
+  entity.generate(out)
 end

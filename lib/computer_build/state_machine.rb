@@ -69,7 +69,7 @@ module ComputerBuild
       @transitions << Transition.new(options)
     end
 
-    def generate
+    def generate(out)
       representation = entity(@name) do |e|
         e.port "clock", :in, "std_logic"
 
@@ -125,7 +125,7 @@ module ComputerBuild
         end
       end
 
-      representation.generate
+      representation.generate(out)
     end
   end
 end
