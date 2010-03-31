@@ -72,6 +72,7 @@ module VHDL
       @ports = []
       @signals = []
       @types = []
+      @components = []
       body[self]
     end
 
@@ -92,6 +93,10 @@ module VHDL
       @types << Type.new(*args)
     end
 
+    def component(*args, &body)
+      @components << Component.new(*args, &body)
+    end
+
     def generate(out=$stdout)
       out.puts "ENTITY #{@name} IS"
       out.puts "PORT("
@@ -103,9 +108,36 @@ module VHDL
       out.puts "ARCHITECTURE arch_#{@name} OF #{@name} IS"
       @types.each {|t| t.generate(out, 1)}
       @signals.each {|t| t.generate(out, 1)}
+      @components.each {|c| c.generate(out, 1)}
       out.puts "BEGIN"
       @behavior.generate(out, 1)
       out.puts "END arch_#{@name};"
+    end
+  end
+
+  class Component < MultiLineStatement
+    def initialize(name)
+      @name = name
+      @ports = []
+      yield(self)
+    end
+
+    def in(name, type)
+      @ports << Port.new(name, :in, type)
+    end
+
+    def out(name, type)
+      @ports << Port.new(name, :out, type)
+    end
+
+    def generate(out, indent)
+      out.puts "  "*indent + "COMPONENT #{@name}"
+      out.puts "  "*indent + "PORT("
+      @ports.each_with_index do |port, index|
+        port.generate(out, indent+1, (index == @ports.length-1))
+      end
+      out.puts "  "*indent + ");"
+      out.puts "  "*indent + "END COMPONENT;"
     end
   end
 
@@ -146,17 +178,31 @@ module VHDL
   end
 
   class Behavior
+    include StatementBlock
+
     def initialize(body)
-      @definition = []
+      @statements = []
       body.call(self)
     end
 
     def process(inputs, &body)
-      @definition << VHDL::Process.new(inputs, body)
+      @statements << VHDL::Process.new(inputs, body)
     end
-    
-    def generate(out, indent)
-      @definition.each {|d| d.generate(out, indent+1) }
+
+    def instance(*args)
+      @statements << Instance.new(*args)
+    end
+  end
+
+  class Instance < SingleLineStatement
+    def initialize(component, name, *ports)
+      @component = component
+      @name = name
+      @ports = ports
+    end
+
+    def line
+      "#{@name}: #{@component} PORT MAP(#{@ports.join(', ')});"
     end
   end
 
@@ -352,6 +398,10 @@ end
 
 def block(&body)
   VHDL::Block.new(body)
+end
+
+def subbits(sym, range)
+  "#{sym}(#{range.first} downto #{range.last})".to_sym
 end
 
 # Monkeypatching

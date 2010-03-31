@@ -29,8 +29,13 @@ class Computer
     control = state_machine("control") do |m|
       m.input :reset, VHDL::STD_LOGIC
       m.input :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+      control_signals.each do |sig|
+        m.output sig, VHDL::STD_LOGIC
+      end
+
       m.signal :opcode,
         VHDL::STD_LOGIC_VECTOR((opcodes.values.first.length - 1)..0)
+
       m.reset do |r|
         r.goto :fetch
         control_signals.each do |sig|
@@ -44,7 +49,7 @@ class Computer
             s.assign sig, state.control_signals.include?(sig) ? '1' : '0'
           end
 
-          if name == 'fetch'
+          if name == 'store_instruction'
             s.assign :opcode, "2 downto 0", :system_bus, "7 downto 5"
           end
         end
@@ -65,9 +70,66 @@ class Computer
       e.port :out, :bus_inspection, VHDL::STD_LOGIC_VECTOR(7..0)
 
       e.signal :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+
+      control_signals.each do |sig|
+        e.signal sig, VHDL::STD_LOGIC
+      end
+
+      e.component :reg do |c|
+        c.in :clock, VHDL::STD_LOGIC
+        c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
+      end
+
+      e.component :ram do |c|
+        c.in :clock, VHDL::STD_LOGIC
+        c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.in :address, VHDL::STD_LOGIC_VECTOR(3..0)
+        c.in :wr_data, VHDL::STD_LOGIC
+        c.in :wr_addr, VHDL::STD_LOGIC
+        c.in :rd, VHDL::STD_LOGIC
+      end
+
+      e.component :alu do |c|
+        c.in :clock, VHDL::STD_LOGIC
+        c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.in :op, VHDL::STD_LOGIC_VECTOR(2..0)
+        c.in :wr_a, VHDL::STD_LOGIC
+        c.in :wr_b, VHDL::STD_LOGIC
+        c.in :rd, VHDL::STD_LOGIC
+      end
+
+      e.component :control_unit do |c|
+        c.in :clock, VHDL::STD_LOGIC
+        c.in :reset, VHDL::STD_LOGIC
+        c.in :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+        control_signals.each do |sig|
+          c.out sig, VHDL::STD_LOGIC
+        end
+
+      end
+
+      e.behavior do |b|
+        b.instance :reg, "pc", :clock, :system_bus, :system_bus, :wr_pc, :rd_pc
+        b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
+        b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
+        b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 7..4), :wr_MD, :wr_MA, :rd_MD
+        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_op, :wr_alu_a, :wr_alu_b, :rd_alu
+        b.instance :control_unit, "control0", [:clock, :reset, :system_bus] + control_signals
+        b.assign :bus_inspection, :system_bus
+      end
     end
     
-    control.generate
+    Dir.mkdir @name rescue nil # ignore error if dir already exists
+    File.open(File.join(@name, 'control.vhdl'), 'w') do |f|
+      generate_vhdl(control, f)
+    end
+
+    File.open(File.join(@name, 'main.vhdl'), 'w') do |f|
+      generate_vhdl(main, f)
+    end
   end
   
   # inner classes
