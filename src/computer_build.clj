@@ -12,7 +12,7 @@
 
 (def static-states {
   :fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
-  :store_instruction {:control-signals '(:rd_MD, :wr_IR), :next :decode}
+  :store_instruction {:control-signals '(:rd_MD, :wr_IR, :inc_pc), :next :decode}
   :decode {:control-signals '()}
 })
 
@@ -126,6 +126,7 @@
           (signal :opcode ~(std-logic-vector 7 5))
           (signal :wr_pc ~std-logic)
           (signal :rd_pc ~std-logic)
+          (signal :inc_pc ~std-logic)
           (signal :wr_IR ~std-logic)
           (signal :rd_IR ~std-logic)
           (signal :wr_MA ~std-logic)
@@ -145,6 +146,14 @@
             (:data_out :out ~(std-logic-vector 7 0))
             (:wr :in ~std-logic)
             (:rd :in ~std-logic))
+
+          (component :program_counter
+            (:clock :in ~std-logic)
+            (:data_in :in ~(std-logic-vector 7 0))
+            (:data_out :out ~(std-logic-vector 7 0))
+            (:wr :in ~std-logic)
+            (:rd :in ~std-logic)
+            (:inc :in ~std-logic))
 
           (component :ram
             (:clock :in ~std-logic)
@@ -169,7 +178,7 @@
             ]
           ; architecture
           [
-          (instance :reg "pc" :clock :system_bus :system_bus :wr_pc :rd_pc)   ; program counter
+          (instance :program_counter "pc" :clock :system_bus :system_bus :wr_pc :rd_pc, :inc_pc)   ; program counter
           (instance :reg "ir" :clock :system_bus :system_bus :wr_IR :rd_IR)   ; instruction register
           (instance :reg "A" :clock :system_bus :system_bus :wr_A :rd_A)      ; accumulator
           (instance :ram "main_memory" :clock :system_bus :system_bus ~(subbits :system_bus 4 0) :wr_MD :wr_MA :rd_MD)
