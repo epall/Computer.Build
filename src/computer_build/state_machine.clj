@@ -46,10 +46,13 @@
           (signal :state "STATE_TYPE")
           ~@(map #(cons 'signal %) signals))
           ; Behavior
-          (process (:clock)
-                   [(if-elsif (= :reset "1")
+          (process (:clock :state :reset)
+                   [(if-else (= :reset "1")
+                             ; true body
                              ~(rewrite-gotos :state reset)
-                             (and (event :clock) (= :clock "1"))
-                             [(case :state ~@(flatten-states states))
-                              ~@(map (partial translate-transition :state) transitions)])
-                    ]))))
+                             ; false body
+                             [
+                              (case :state ~@(flatten-states states))
+                              (if (and (event :clock) (= :clock 1))
+                              ~(vec (map (partial translate-transition :state) transitions)))
+                             ])]))))

@@ -40,12 +40,15 @@
          (partition 2 (concat (interpose ";" lines) [""]))))
 
 (defn keyword-to-str [sym]
-  (if (keyword? sym) (name sym)
-    (if (= (count sym) 1)
+  (cond
+    (keyword? sym) (name sym)
+    (number? sym) (str \' sym \')
+    (string? sym) (if (= (count sym) 1)
       (str \' sym \')
       (str \" sym \"))))
 
 (defmulti to-vhdl (fn [block]
+  (if (symbol? block) (throw (Error. (str "Invalid VHDL: " block))))
   (if (vector? block) :block
     (-> block first name keyword))))
 
@@ -127,11 +130,17 @@
 ; inline / single-line statements
 
 (defmethod to-vhdl :<= [[type & args]]
-  (if (= (count args) 2)
-    (let [[target expression] args]
-      (str (spaces (keyword-to-str target) "<=" (keyword-to-str expression)) \;))
-    (let [[target target-index source source-index] args]
-      (str (keyword-to-str target) "(" target-index ") <= " (keyword-to-str source) "(" source-index ");"))))
+  (cond
+    (= (count args) 2)
+      (let [[target expression] args]
+        (str (spaces (keyword-to-str target) "<=" (keyword-to-str expression)) \;))
+    (= (count args) 4)
+      (let [[target target-index source source-index] args]
+        (str (keyword-to-str target) "(" target-index ") <= " (keyword-to-str source) "(" source-index ");"))
+    (= (count args) 6)
+      (let [[target target-start target-end source source-start source-end] args]
+        (str (keyword-to-str target) "(" target-start " downto " target-end ")"
+             " <= " (keyword-to-str source) "(" source-start " downto " source-end ");"))))
 
 (def-vhdl-inline :port [id direction kind]
   (keyword-to-str id) ": " (keyword-to-str direction) " " kind)
@@ -151,8 +160,8 @@
 (def-vhdl-inline :deftype [name values]
   "TYPE " name " IS (" (str-join ", " values) ");")
 
-(def-vhdl-inline :and [condA condB]
-  (to-vhdl condA) " AND " (to-vhdl condB))
+(def-vhdl-inline :and [& conditions]
+  (str-join " AND " (map to-vhdl conditions)))
 
 (def-vhdl-inline :event [target]
   (keyword-to-str target) "'EVENT")

@@ -76,35 +76,35 @@
   (let [states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map (fn [[_ body]] (:control-signals body)) states)))
         opcodes (make-opcodes instructions)
+        opcode-length (count (second (first opcodes)))
         inputs {:reset std-logic :system_bus (std-logic-vector 7 0)}
         outputs (zipmap control-signals (repeat (count control-signals) std-logic))]
     (defn realize-state [state]
       (let [highs (:control-signals state)]
         (vec (concat (map #(list 'high %) highs) (map #(list 'low %) (difference control-signals highs))))))
-    (defn tweak-instruction-fetch [body]
-      ; FIXME hard-coded
-      (vec (list* '(<= :opcode "2 downto 0" :system_bus "7 downto 5") body)))
+    (defn tweak-instruction-fetch [entity]
+      (concat entity `((process (:clock) [
+        (if (and (event :clock) (= :clock 0) (= :state :state_store_instruction))
+        (<= :opcode ~(- opcode-length 1) 0 :system_bus 7 ~(- 8 opcode-length)))]))))
 
-    (list (state-machine "control_unit"
+    (list (tweak-instruction-fetch (state-machine "control_unit"
                    ; inputs
                    inputs
                    ; outputs
                    outputs
                    ; signals
-                   { :opcode (std-logic-vector (- (count (second (first opcodes))) 1) 0) }
+                   { :opcode (std-logic-vector (- opcode-length 1) 0) }
                    ; reset
                    (list* '(goto :fetch) (map #(list 'low %) control-signals))
                    ; states
-                   (let [realized-states (mapmap realize-state states)] realized-states
-                         (assoc realized-states :store_instruction 
-                          (tweak-instruction-fetch (:store_instruction realized-states))))
+                   (mapmap realize-state states)
                    ; transitions
                    (concat
                      ; states
                      (map #(list (first %) (:next (second %))) (dissoc states :decode))
                      ; decode
                      (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes))
-                   ) (assoc inputs :clock std-logic) outputs)))
+                   )) (assoc inputs :clock std-logic) outputs)))
 
 (defn build* [cpuname options instructions]
   (.mkdir (java.io.File. cpuname))
