@@ -150,7 +150,7 @@
             (:clock :in ~std-logic)
             (:data_in :in ~(std-logic-vector 7 0))
             (:data_out :out ~(std-logic-vector 7 0))
-            (:address :in ~(std-logic-vector 3 0))
+            (:address :in ~(std-logic-vector 4 0))
             (:wr_data :in ~std-logic)
             (:wr_addr :in ~std-logic)
             (:rd :in ~std-logic))
@@ -172,7 +172,7 @@
           (instance :reg "pc" :clock :system_bus :system_bus :wr_pc :rd_pc)   ; program counter
           (instance :reg "ir" :clock :system_bus :system_bus :wr_IR :rd_IR)   ; instruction register
           (instance :reg "A" :clock :system_bus :system_bus :wr_A :rd_A)      ; accumulator
-          (instance :ram "main_memory" :clock :system_bus :system_bus ~(subbits :system_bus 7 4) :wr_MD :wr_MA :rd_MD)
+          (instance :ram "main_memory" :clock :system_bus :system_bus ~(subbits :system_bus 4 0) :wr_MD :wr_MA :rd_MD)
           (instance :alu "alu0" :clock :system_bus :system_bus :alu_op :wr_alu_a :wr_alu_b :rd_alu)
           (instance :control_unit "control0" ~@(map first (concat control-in control-out)))
           (<= :bus_inspection :system_bus)
