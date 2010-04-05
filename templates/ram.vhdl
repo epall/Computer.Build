@@ -5,7 +5,7 @@ USE ieee.numeric_std.ALL;
 ENTITY ram IS
   GENERIC
   (
-    ADDRESS_WIDTH  : integer := 4;
+    ADDRESS_WIDTH  : integer := 5;
     DATA_WIDTH     : integer := 8
   );
   PORT
@@ -26,16 +26,12 @@ ARCHITECTURE rtl OF ram IS
   SIGNAL ram_block : RAM;
   SIGNAL addr_cache : std_logic_vector(ADDRESS_WIDTH - 1 DOWNTO 0);
 BEGIN
+  WITH rd SELECT
+    data_out <= ram_block(to_integer(unsigned(addr_cache))) WHEN '1',
+                "ZZZZZZZZ" WHEN OTHERS;
+
   PROCESS (clock)
   BEGIN
-      IF clock'EVENT AND clock = '1' THEN
-        IF rd = '1' THEN
-          data_out <= ram_block(to_integer(unsigned(addr_cache)));
-        ELSE
-          data_out <= "ZZZZZZZZ";
-        END IF;
-      END IF;
-
     IF clock'EVENT AND clock = '0' THEN
       IF(wr_data = '1') THEN
         ram_block(to_integer(unsigned(addr_cache))) <= data_in;

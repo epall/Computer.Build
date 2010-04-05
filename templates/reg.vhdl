@@ -20,16 +20,12 @@ END reg;
 ARCHITECTURE rtl OF reg IS
   SIGNAL regval : std_logic_vector(DATA_WIDTH - 1 DOWNTO 0);
 BEGIN
+  WITH rd SELECT
+    data_out <= regval WHEN '1',
+                "ZZZZZZZZ" WHEN OTHERS;
+  
   PROCESS (clock)
   BEGIN
-  IF clock'EVENT AND clock = '1' THEN
-    IF rd = '1' THEN
-      data_out <= regval;
-    ELSE
-      data_out <= "ZZZZZZZZ";
-    END IF;
-  END IF;
-
   IF (clock'event AND clock = '0' AND wr = '1') THEN
     regval <= data_in;
     END IF;

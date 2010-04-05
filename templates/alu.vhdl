@@ -20,14 +20,9 @@ ARCHITECTURE arch OF alu IS
   SIGNAL operand_b : SIGNED(DATA_WIDTH-1 downto 0);
   SIGNAL result    : SIGNED(DATA_WIDTH-1 downto 0);
 BEGIN
-  PROCESS(rd)
-  BEGIN
-    IF rd = '1' THEN
-      data_out <= std_logic_vector(result);
-    ELSE
-      data_out <= "ZZZZZZZZ";
-    END IF;
-  END PROCESS;
+  WITH rd SELECT
+    data_out <= std_logic_vector(result) WHEN '1',
+                "ZZZZZZZZ" WHEN OTHERS;
 
   PROCESS(op, operand_a, operand_b)
   BEGIN
