@@ -28,13 +28,13 @@ BEGIN
   BEGIN
     CASE op IS
       WHEN "000" =>
-        result <= operand_a and operand_b;
+        result <= operand_a;
       WHEN "100" =>
         result <= operand_a and operand_b;
       WHEN "001" =>
         result <= operand_a or operand_b;
       WHEN "101" =>
-        result <= operand_a or operand_b;
+        result <= not operand_a;
       WHEN "010" =>
         result <= operand_a + operand_b;
       WHEN "110" =>

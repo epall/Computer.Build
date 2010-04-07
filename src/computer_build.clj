@@ -10,6 +10,14 @@
 (defn wr [port]
   (keyword (str "wr_" (name port))))
 
+(defn alu-op-to-opcode [op]
+  (if op
+    (cond
+      (= (name op) "complement") "101"
+      (= (name op) "+") "010"
+      (= (name op) "-") "110")
+    "000"))
+
 (def static-states {
   :fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
   :store_instruction {:control-signals '(:rd_MD, :wr_IR, :inc_pc), :next :decode}
@@ -78,10 +86,14 @@
         opcodes (make-opcodes instructions)
         opcode-length (count (second (first opcodes)))
         inputs {:reset std-logic :system_bus (std-logic-vector 7 0)}
-        outputs (zipmap control-signals (repeat (count control-signals) std-logic))]
+        outputs (assoc
+                  (zipmap control-signals (repeat (count control-signals) std-logic))
+                  :alu_operation (std-logic-vector 2 0))]
     (defn realize-state [state]
-      (let [highs (:control-signals state)]
-        (vec (concat (map #(list 'high %) highs) (map #(list 'low %) (difference control-signals highs))))))
+      (let [highs (:control-signals state)
+            assertions (map #(list 'high %) highs)
+            clears (map #(list 'low %) (difference control-signals highs))]
+        (vec (concat assertions clears `((<= :alu_operation ~(alu-op-to-opcode (:alu_op state))))))))
     (defn tweak-instruction-fetch [entity]
       (concat entity `((process (:clock) [
         (if (and (event :clock) (= :clock 0) (= :state :state_store_instruction))
@@ -91,11 +103,11 @@
                    ; inputs
                    inputs
                    ; outputs
-                   outputs
+                   outputs 
                    ; signals
                    { :opcode (std-logic-vector (- opcode-length 1) 0) }
                    ; reset
-                   (list* '(goto :fetch) (map #(list 'low %) control-signals))
+                   (list* '(<= :alu_operation "000") '(goto :fetch) (map #(list 'low %) control-signals))
                    ; states
                    (mapmap realize-state states)
                    ; transitions
@@ -122,7 +134,7 @@
            (:bus_inspection :out ~(std-logic-vector 7 0))]
           ; defs
           [(signal :system_bus ~(std-logic-vector 7 0))
-          (signal :alu_op ~(std-logic-vector 2 0))
+          (signal :alu_operation ~(std-logic-vector 2 0))
           (signal :opcode ~(std-logic-vector 7 5))
           (signal :wr_pc ~std-logic)
           (signal :rd_pc ~std-logic)
@@ -182,7 +194,7 @@
           (instance :reg "ir" :clock :system_bus :system_bus :wr_IR :rd_IR)   ; instruction register
           (instance :reg "A" :clock :system_bus :system_bus :wr_A :rd_A)      ; accumulator
           (instance :ram "main_memory" :clock :system_bus :system_bus ~(subbits :system_bus 4 0) :wr_MD :wr_MA :rd_MD)
-          (instance :alu "alu0" :clock :system_bus :system_bus :alu_op :wr_alu_a :wr_alu_b :rd_alu)
+          (instance :alu "alu0" :clock :system_bus :system_bus :alu_operation :wr_alu_a :wr_alu_b :rd_alu)
           (instance :control_unit "control0" ~@(map first (concat control-in control-out)))
           (<= :bus_inspection :system_bus)
           ]))))))
