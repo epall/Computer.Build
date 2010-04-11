@@ -18,12 +18,6 @@
       (= (name op) "-") "110")
     "000"))
 
-(def static-states {
-  :fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
-  :store_instruction {:control-signals '(:rd_MD, :wr_IR, :inc_pc), :next :decode}
-  :decode {:control-signals '()}
-})
-
 (defn flatten-1 [things]
   (if (empty? things)
     '()
@@ -81,10 +75,17 @@
 (defn control-unit [instructions]
   "Given a set of states, make a control unit that will
   execute them"
-  (let [states (merge (make-states instructions) static-states)
+  (let [opcodes (make-opcodes instructions)
+        opcode-width (count (second (first opcodes)))
+        static-states {:fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction, }
+                        :store_instruction {:next :decode,
+                                            :control-signals '(:rd_MD, :wr_IR, :inc_pc),
+                                            :code
+                                            [`(if (and (event :clock) (= :clock 0))
+                                                (<= :opcode ~(- opcode-width 1) 0 :system_bus 7 ~(- 8 opcode-width)))]}
+                        :decode {:control-signals '()}}
+        states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map (fn [[_ body]] (:control-signals body)) states)))
-        opcodes (make-opcodes instructions)
-        opcode-length (count (second (first opcodes)))
         inputs {:reset std-logic :system_bus (std-logic-vector 7 0)}
         outputs (assoc
                   (zipmap control-signals (repeat (count control-signals) std-logic))
@@ -93,19 +94,16 @@
       (let [highs (:control-signals state)
             assertions (map #(list 'high %) highs)
             clears (map #(list 'low %) (difference control-signals highs))]
-        (vec (concat assertions clears `((<= :alu_operation ~(alu-op-to-opcode (:alu_op state))))))))
-    (defn tweak-instruction-fetch [entity]
-      (concat entity `((process (:clock) [
-        (if (and (event :clock) (= :clock 0) (= :state :state_store_instruction))
-        (<= :opcode ~(- opcode-length 1) 0 :system_bus 7 ~(- 8 opcode-length)))]))))
+        (vec (concat (:code state) assertions clears
+                     `((<= :alu_operation ~(alu-op-to-opcode (:alu_op state))))))))
 
-    (list (tweak-instruction-fetch (state-machine "control_unit"
+    (list (state-machine "control_unit"
                    ; inputs
                    inputs
                    ; outputs
                    outputs 
                    ; signals
-                   { :opcode (std-logic-vector (- opcode-length 1) 0) }
+                   { :opcode (std-logic-vector (- opcode-width 1) 0) }
                    ; reset
                    (list* '(<= :alu_operation "000") '(goto :fetch) (map #(list 'low %) control-signals))
                    ; states
@@ -115,13 +113,12 @@
                      ; states
                      (map #(list (first %) (:next (second %))) (dissoc states :decode))
                      ; decode
-                     (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes))
-                   )) (assoc inputs :clock std-logic) outputs)))
+                     (map #(list :decode `(= :opcode ~(second %)) (keyword (str (first %) "_0"))) opcodes)))
+          (assoc inputs :clock std-logic) outputs)))
 
 (defn build* [cpuname options instructions]
   (.mkdir (java.io.File. cpuname))
-  (let [states (merge static-states (make-states instructions))
-        [control-unit control-in control-out] (control-unit instructions)]
+  (let [[control-unit control-in control-out] (control-unit instructions)]
     (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))
                 control-vhdl (java.io.FileWriter. (str cpuname "/control.vhdl"))]
       (binding [*out* control-vhdl]
