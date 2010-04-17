@@ -88,16 +88,16 @@ module ComputerBuild
         end
 
         e.behavior do |b|
-          b.process [:clock] do |p|
+          b.process [:clock, :reset, :state] do |p|
             if @reset
-              ifthenelse = p.if(equal(:reset, '1')) do |b|
+              ifelse = p.if(equal(:reset, '1')) do |b|
                 def b.goto(state)
                   self.assign(:state, ("state_"+state.to_s).to_sym)
                 end
-                @reset[b]
+                @reset.call(b)
               end
 
-              ifthenelse.elsif(event(:clock), equal(:clock, "1")) do |b|
+              ifelse.else do |b|
                 b.case :state do |c|
                   @states.each do |state|
                     c["state_" + state.name.to_s] = state
@@ -105,20 +105,20 @@ module ComputerBuild
                 end
               end
             else
-              p.if(event(:clock), equal(:clock, "1")) do |b|
-                b.case :state do |c|
-                  @states.each do |state|
-                    c["state_" + state.name.to_s] = state
-                  end
+              p.case :state do |c|
+                @states.each do |state|
+                  c["state_" + state.name.to_s] = state
                 end
               end
             end
 
-            @transitions.each do |transition|
-              conditions = [equal(:state, State.full_name(transition.from))]
-              conditions << transition.condition unless transition.condition.nil?
-              p.if(*conditions) do |b|
-                b.assign(:state, State.full_name(transition.to))
+            p.if event(:clock), equal(:clock, "1") do |b|
+              @transitions.each do |transition|
+                conditions = [equal(:state, State.full_name(transition.from))]
+                conditions << transition.condition unless transition.condition.nil?
+                b.if(*conditions) do |c|
+                  c.assign(:state, State.full_name(transition.to))
+                end
               end
             end
           end # process

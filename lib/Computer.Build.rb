@@ -24,6 +24,7 @@ class Computer
   def generate
     states = make_states(@instructions).merge(static_states)
     opcodes = make_opcodes(@instructions)
+    opcode_length = opcodes.values.first.length
     control_signals = states.values.map(&:control_signals).flatten.uniq
 
     control = state_machine("control") do |m|
@@ -34,7 +35,7 @@ class Computer
       end
 
       m.signal :opcode,
-        VHDL::STD_LOGIC_VECTOR((opcodes.values.first.length - 1)..0)
+        VHDL::STD_LOGIC_VECTOR((opcode_length-1)..0)
 
       m.reset do |r|
         r.goto :fetch
@@ -50,7 +51,9 @@ class Computer
           end
 
           if name == 'store_instruction'
-            s.assign :opcode, "2 downto 0", :system_bus, "7 downto 5"
+            s.if event(:clock), equal(:clock,"0") do |thn|
+              thn.assign :opcode, "#{opcode_length-1} downto 0", :system_bus, "7 downto #{7-opcode_length+1}"
+            end
           end
         end
 
@@ -85,7 +88,7 @@ class Computer
         c.in :clock, VHDL::STD_LOGIC
         c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
         c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
-        c.in :address, VHDL::STD_LOGIC_VECTOR(3..0)
+        c.in :address, VHDL::STD_LOGIC_VECTOR(4..0)
         c.in :wr_data, VHDL::STD_LOGIC
         c.in :wr_addr, VHDL::STD_LOGIC
         c.in :rd, VHDL::STD_LOGIC
@@ -115,7 +118,7 @@ class Computer
         b.instance :reg, "pc", :clock, :system_bus, :system_bus, :wr_pc, :rd_pc
         b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
-        b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 7..4), :wr_MD, :wr_MA, :rd_MD
+        b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
         b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_op, :wr_alu_a, :wr_alu_b, :rd_alu
         b.instance :control_unit, "control0", [:clock, :reset, :system_bus] + control_signals
         b.assign :bus_inspection, :system_bus
