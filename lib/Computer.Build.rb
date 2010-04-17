@@ -82,6 +82,17 @@ class Computer
         c.in :clock, VHDL::STD_LOGIC
         c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
         c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.in :wr, VHDL::STD_LOGIC
+        c.in :rd, VHDL::STD_LOGIC
+      end
+
+      e.component :program_counter do |c|
+        c.in :clock, VHDL::STD_LOGIC
+        c.in :data_in, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.out :data_out, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.in :wr, VHDL::STD_LOGIC
+        c.in :rd, VHDL::STD_LOGIC
+        c.in :inc, VHDL::STD_LOGIC
       end
 
       e.component :ram do |c|
@@ -115,7 +126,7 @@ class Computer
       end
 
       e.behavior do |b|
-        b.instance :reg, "pc", :clock, :system_bus, :system_bus, :wr_pc, :rd_pc
+        b.instance :program_counter, "pc", :clock, :system_bus, :system_bus, :wr_pc, :rd_pc, :inc_pc
         b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
         b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
@@ -251,7 +262,7 @@ class Computer
     end
 
     states['store_instruction'] = MicrocodeState.new do |s|
-      s.control_signals = ['rd_MD', 'wr_IR']
+      s.control_signals = ['rd_MD', 'wr_IR', 'inc_pc']
       s.next = 'decode'
     end
 
