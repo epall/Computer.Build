@@ -29,7 +29,7 @@ class Computer
 
     control = state_machine("control") do |m|
       m.input :reset, VHDL::STD_LOGIC
-      m.input :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+      m.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
       control_signals.each do |sig|
         m.output sig, VHDL::STD_LOGIC
       end
@@ -52,6 +52,10 @@ class Computer
             s.assign sig, state.control_signals.include?(sig) ? '1' : '0'
           end
           s.assign :alu_operation, state.alu_op ? state.alu_op.opcode : "000"
+
+          if state.constant_value
+            s.assign :system_bus, state.constant_value
+          end
 
           if name == 'store_instruction'
             s.if event(:clock), equal(:clock,"0") do |thn|

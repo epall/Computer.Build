@@ -31,6 +31,7 @@ module ComputerBuild
       @name = name
       @inputs = {}
       @outputs = {}
+      @inouts = {}
       @signals = []
       @states = []
       @transitions = []
@@ -53,6 +54,10 @@ module ComputerBuild
       @outputs[name] = type
     end
 
+    def inout(name, type)
+      @inouts[name] = type
+    end
+
     def signal(*rest)
       @signals << rest
     end
@@ -71,7 +76,7 @@ module ComputerBuild
 
     def generate(out)
       representation = entity(@name) do |e|
-        e.port "clock", :in, "std_logic"
+        e.port "clock", :in, VHDL::STD_LOGIC
 
         @inputs.each do |name, type|
           e.port name, :in, type
@@ -79,6 +84,10 @@ module ComputerBuild
 
         @outputs.each do |name, type|
           e.port name, :out, type
+        end
+
+        @inouts.each do |name, type|
+          e.port name, :inout, type
         end
 
         e.type "STATE_TYPE", @states.map {|s| "state_"+s.name.to_s}
