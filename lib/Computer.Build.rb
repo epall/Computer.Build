@@ -33,6 +33,7 @@ class Computer
       control_signals.each do |sig|
         m.output sig, VHDL::STD_LOGIC
       end
+      m.output :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
 
       m.signal :opcode,
         VHDL::STD_LOGIC_VECTOR((opcode_length-1)..0)
@@ -42,6 +43,7 @@ class Computer
         control_signals.each do |sig|
           r.low sig.to_sym
         end
+        r.assign :alu_operation, "000"
       end
 
       states.each do |name, state|
@@ -49,6 +51,7 @@ class Computer
           control_signals.each do |sig|
             s.assign sig, state.control_signals.include?(sig) ? '1' : '0'
           end
+          s.assign :alu_operation, state.alu_op ? state.alu_op.opcode : "000"
 
           if name == 'store_instruction'
             s.if event(:clock), equal(:clock,"0") do |thn|
@@ -130,7 +133,7 @@ class Computer
         b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
         b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
-        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_op, :wr_alu_a, :wr_alu_b, :rd_alu
+        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu
         b.instance :control_unit, "control0", [:clock, :reset, :system_bus] + control_signals
         b.assign :bus_inspection, :system_bus
       end
@@ -172,6 +175,13 @@ class Computer
       @op = op
       @operands = operands
     end
+
+    def opcode
+      return {
+        :complement => "101",
+        :add => "010",
+        :subtract => "110"}[@op]
+    end
   end
 
   private
@@ -196,7 +206,7 @@ class Computer
         steps = []
         steps << MicrocodeState.new do |state|
           state.control_signals = ["rd_#{@source.operands.first}", "wr_alu_a"]
-          state.alu_op = @source.op
+          state.alu_op = @source
         end
 
         if @source.operands.length == 2
@@ -212,7 +222,7 @@ class Computer
 
         steps << MicrocodeState.new do |state|
           state.control_signals = ["rd_alu", "wr_#{@target}"]
-          state.alu_op = @source.op
+          state.alu_op = @source
         end
         return steps
       end
