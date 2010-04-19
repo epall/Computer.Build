@@ -38,18 +38,7 @@ module VHDL
     end
   end
 
-  class SingleLineStatement
-    def generate(out, indent)
-      out.print "  " * indent
-      out.print self.line()
-      out.print "\n"
-    end
-  end
-  
-  class MultiLineStatement
-  end
-
-  class InlineStatement
+  class Statement
     protected
 
     def quoted(expression)
@@ -67,6 +56,20 @@ module VHDL
     end
   end
 
+  class SingleLineStatement < Statement
+    def generate(out, indent)
+      out.print "  " * indent
+      out.print self.line()
+      out.print "\n"
+    end
+  end
+  
+  class MultiLineStatement < Statement
+  end
+
+  class InlineStatement < Statement
+  end
+
   class Entity
     attr_reader :name
     def initialize(name, body)
@@ -75,6 +78,7 @@ module VHDL
       @signals = []
       @types = []
       @components = []
+      @constants = []
       body[self]
     end
 
@@ -99,6 +103,10 @@ module VHDL
       @components << Component.new(*args, &body)
     end
 
+    def constants=(consts)
+      @constants = consts
+    end
+
     def generate(out=$stdout)
       out.puts "ENTITY #{@name} IS"
       out.puts "PORT("
@@ -111,6 +119,7 @@ module VHDL
       @types.each {|t| t.generate(out, 1)}
       @signals.each {|t| t.generate(out, 1)}
       @components.each {|c| c.generate(out, 1)}
+      @constants.each {|c| c.generate(out, 1)}
       out.puts "BEGIN"
       @behavior.generate(out, 1)
       out.puts "END arch_#{@name};"
@@ -130,6 +139,10 @@ module VHDL
 
     def out(name, type)
       @ports << Port.new(name, :out, type)
+    end
+
+    def inout(name, type)
+      @ports << Port.new(name, :inout, type)
     end
 
     def generate(out, indent)
@@ -176,6 +189,18 @@ module VHDL
 
     def line
       "SIGNAL #{@id} : #{@type};"
+    end
+  end
+
+  class Constant < SingleLineStatement
+    def initialize(name, type, value)
+      @name = name
+      @type = type
+      @value = value
+    end
+
+    def line
+      "CONSTANT #{@name} : #{@type} := #{quoted(@value)};"
     end
   end
 
@@ -416,5 +441,7 @@ end
 def generate_vhdl(entity, out=$stdout)
   out.puts "LIBRARY ieee;"
   out.puts "USE ieee.std_logic_1164.all;"
+  out.puts "USE ieee.numeric_std.all;"
+  out.puts
   entity.generate(out)
 end

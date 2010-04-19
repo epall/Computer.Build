@@ -40,4 +40,8 @@ Computer.Build "mccalla" do |computer|
     i.move :MA, :IR
     i.move :MD, :A
   end
+
+  computer.instruction "jmp" do |i|
+    i.move :pc, :IR
+  end
 end

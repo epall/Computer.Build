@@ -1,6 +1,14 @@
 require 'computer_build/vhdl'
 require 'computer_build/state_machine'
 
+
+class Fixnum
+  def to_logic(width)
+    str = self.to_s(2)
+    return "0"*(width-str.length) + str
+  end
+end
+
 class Computer
   def self.Build(name)
     instance = Computer.new(name)
@@ -27,7 +35,7 @@ class Computer
     opcode_length = opcodes.values.first.length
     control_signals = states.values.map(&:control_signals).flatten.uniq
 
-    control = state_machine("control") do |m|
+    control = state_machine("control_unit") do |m|
       m.input :reset, VHDL::STD_LOGIC
       m.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
       control_signals.each do |sig|
@@ -38,12 +46,17 @@ class Computer
       m.signal :opcode,
         VHDL::STD_LOGIC_VECTOR((opcode_length-1)..0)
 
+      states.values.map(&:constant_value).compact.uniq.each do |const|
+        m.constant "CONSTANT_#{const}", VHDL::STD_LOGIC_VECTOR(7..0), const.to_logic(8)
+      end
+
       m.reset do |r|
         r.goto :fetch
         control_signals.each do |sig|
           r.low sig.to_sym
         end
         r.assign :alu_operation, "000"
+        r.assign :system_bus, "ZZZZZZZZ"
       end
 
       states.each do |name, state|
@@ -54,7 +67,9 @@ class Computer
           s.assign :alu_operation, state.alu_op ? state.alu_op.opcode : "000"
 
           if state.constant_value
-            s.assign :system_bus, state.constant_value
+            s.assign :system_bus, "CONSTANT_#{state.constant_value}".to_sym
+          else
+            s.assign :system_bus, "ZZZZZZZZ"
           end
 
           if name == 'store_instruction'
@@ -75,11 +90,12 @@ class Computer
     end
 
     main = entity("main") do |e|
-      e.port :in, :clock, VHDL::STD_LOGIC
-      e.port :in, :reset, VHDL::STD_LOGIC
-      e.port :out, :bus_inspection, VHDL::STD_LOGIC_VECTOR(7..0)
+      e.port :clock ,:in, VHDL::STD_LOGIC
+      e.port :reset, :in, VHDL::STD_LOGIC
+      e.port :bus_inspection, :out, VHDL::STD_LOGIC_VECTOR(7..0)
 
       e.signal :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+      e.signal :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
 
       control_signals.each do |sig|
         e.signal sig, VHDL::STD_LOGIC
@@ -125,11 +141,11 @@ class Computer
       e.component :control_unit do |c|
         c.in :clock, VHDL::STD_LOGIC
         c.in :reset, VHDL::STD_LOGIC
-        c.in :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.out :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
         control_signals.each do |sig|
           c.out sig, VHDL::STD_LOGIC
         end
-
       end
 
       e.behavior do |b|
@@ -138,7 +154,7 @@ class Computer
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
         b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
         b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu
-        b.instance :control_unit, "control0", [:clock, :reset, :system_bus] + control_signals
+        b.instance :control_unit, "control0", [:clock, :reset, :system_bus, :alu_operation] + control_signals
         b.assign :bus_inspection, :system_bus
       end
     end

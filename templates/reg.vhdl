@@ -24,7 +24,7 @@ BEGIN
     data_out <= regval WHEN '1',
                 "ZZZZZZZZ" WHEN OTHERS;
   
-  PROCESS (clock)
+  PROCESS (clock, wr)
   BEGIN
   IF (clock'event AND clock = '0' AND wr = '1') THEN
     regval <= data_in;

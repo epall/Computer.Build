@@ -11,7 +11,8 @@ ENTITY alu IS
   op        : IN std_logic_vector(2 downto 0);
   wr_a      : IN std_logic;
   wr_b      : IN std_logic;
-  rd        : IN std_logic
+  rd        : IN std_logic;
+  condition : OUT std_logic
       );
 END alu;
 
@@ -26,27 +27,38 @@ BEGIN
 
   PROCESS(op, operand_a, operand_b)
   BEGIN
+    condition <= '0';
     CASE op IS
       WHEN "000" =>
         result <= operand_a;
-      WHEN "100" =>
-        result <= operand_a and operand_b;
       WHEN "001" =>
-        result <= operand_a or operand_b;
-      WHEN "101" =>
-        result <= not operand_a;
+        result <= operand_a and operand_b;
       WHEN "010" =>
+        result <= operand_a or operand_b;
+      WHEN "011" =>
+        result <= not operand_a;
+      WHEN "100" =>
         result <= operand_a + operand_b;
-      WHEN "110" =>
+      WHEN "101" =>
         result <= operand_a - operand_b;
+      WHEN "110" =>
+        IF operand_a = "00000000" THEN
+          result <= "11111111";
+          condition <= '1';
+        ELSE
+          result <= "00000000";
+          condition <= '0';
+        END IF;
       WHEN "111" =>
         IF operand_a < operand_b THEN
           result <= "11111111";
+          condition <= '1';
         ELSE
           result <= "00000000";
+          condition <= '0';
         END IF;
       WHEN others =>
-        result <= operand_a - operand_b;
+        result <= operand_a;
     END CASE;
   END PROCESS;
 

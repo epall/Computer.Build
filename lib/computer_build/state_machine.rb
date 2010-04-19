@@ -35,6 +35,7 @@ module ComputerBuild
       @signals = []
       @states = []
       @transitions = []
+      @constants = []
       body[self]
     end
 
@@ -74,6 +75,10 @@ module ComputerBuild
       @transitions << Transition.new(options)
     end
 
+    def constant(*args)
+      @constants << VHDL::Constant.new(*args)
+    end
+
     def generate(out)
       representation = entity(@name) do |e|
         e.port "clock", :in, VHDL::STD_LOGIC
@@ -96,6 +101,8 @@ module ComputerBuild
           e.signal(*args)
         end
 
+        e.constants = @constants
+
         e.behavior do |b|
           b.process [:clock, :reset, :state] do |p|
             if @reset
@@ -112,6 +119,16 @@ module ComputerBuild
                     c["state_" + state.name.to_s] = state
                   end
                 end
+
+                b.if event(:clock), equal(:clock, "1") do |b|
+                  @transitions.each do |transition|
+                    conditions = [equal(:state, State.full_name(transition.from))]
+                    conditions << transition.condition unless transition.condition.nil?
+                    b.if(*conditions) do |c|
+                      c.assign(:state, State.full_name(transition.to))
+                    end
+                  end
+                end
               end
             else
               p.case :state do |c|
@@ -119,14 +136,14 @@ module ComputerBuild
                   c["state_" + state.name.to_s] = state
                 end
               end
-            end
 
-            p.if event(:clock), equal(:clock, "1") do |b|
-              @transitions.each do |transition|
-                conditions = [equal(:state, State.full_name(transition.from))]
-                conditions << transition.condition unless transition.condition.nil?
-                b.if(*conditions) do |c|
-                  c.assign(:state, State.full_name(transition.to))
+              p.if event(:clock), equal(:clock, "1") do |b|
+                @transitions.each do |transition|
+                  conditions = [equal(:state, State.full_name(transition.from))]
+                  conditions << transition.condition unless transition.condition.nil?
+                  b.if(*conditions) do |c|
+                    c.assign(:state, State.full_name(transition.to))
+                  end
                 end
               end
             end
