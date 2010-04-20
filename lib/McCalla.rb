@@ -22,7 +22,7 @@ Computer.Build "mccalla" do |computer|
   end
 
   computer.instruction "add" do |i|
-    i.move :MA, :IR
+    i.move :MA, bitwise_and(:IR, 0x0F)
     i.move :A, add(:A, :MD)
   end
 
@@ -42,6 +42,6 @@ Computer.Build "mccalla" do |computer|
   end
 
   computer.instruction "jmp" do |i|
-    i.move :pc, :IR
+    i.move :pc, bitwise_and(:IR, 0x0F)
   end
 end

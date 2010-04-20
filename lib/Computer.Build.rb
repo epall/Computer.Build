@@ -198,9 +198,10 @@ class Computer
 
     def opcode
       return {
-        :complement => "101",
-        :add => "010",
-        :subtract => "110"}[@op]
+        :complement => "011",
+        :and => "001",
+        :add => "100",
+        :subtract => "101"}[@op]
     end
   end
 
@@ -310,6 +311,10 @@ end
 
 def add(operand1, operand2)
   Computer::ALUOperation.new(:add, operand1, operand2)
+end
+
+def bitwise_and(operand1, operand2)
+  Computer::ALUOperation.new(:and, operand1, operand2)
 end
 
 def subtract(operand1, operand2)
