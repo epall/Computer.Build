@@ -1,15 +1,9 @@
 require 'computer_build/vhdl'
 require 'computer_build/state_machine'
 
-
-class Fixnum
-  def to_logic(width)
-    str = self.to_s(2)
-    return "0"*(width-str.length) + str
-  end
-end
-
 class Computer
+  include VHDL::Helpers
+
   def self.Build(name)
     instance = Computer.new(name)
     yield(instance)
@@ -23,6 +17,7 @@ class Computer
     @instructions = []
   end
   
+  # DSL method
   def instruction(name)
     inst = Instruction.new(name)
     yield(inst)
@@ -37,11 +32,12 @@ class Computer
 
     control = state_machine("control_unit") do |m|
       m.input :reset, VHDL::STD_LOGIC
+      m.input :condition, VHDL::STD_LOGIC
       m.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+      m.output :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
       control_signals.each do |sig|
         m.output sig, VHDL::STD_LOGIC
       end
-      m.output :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
 
       m.signal :opcode,
         VHDL::STD_LOGIC_VECTOR((opcode_length-1)..0)
@@ -73,13 +69,18 @@ class Computer
           end
 
           if name == 'store_instruction'
-            s.if event(:clock), equal(:clock,"0") do |thn|
+            s.if event(:clock), VHDL::Equal.new(:clock,"0") do |thn|
               thn.assign :opcode, "#{opcode_length-1} downto 0", :system_bus, "7 downto #{7-opcode_length+1}"
             end
           end
         end
 
-        m.transition :from => name, :to => state.next if state.next
+        if state.condition
+          m.transition :from => name, :to => state.next, :on => VHDL::Equal.new(:condition, "0")
+          m.transition :from => name, :to => name+"_0", :on => VHDL::Equal.new(:condition, "1")
+        else
+          m.transition :from => name, :to => state.next if state.next
+        end
       end
 
       # instruction decode
@@ -96,6 +97,7 @@ class Computer
 
       e.signal :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
       e.signal :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
+      e.signal :alu_condition, VHDL::STD_LOGIC
 
       control_signals.each do |sig|
         e.signal sig, VHDL::STD_LOGIC
@@ -136,16 +138,18 @@ class Computer
         c.in :wr_a, VHDL::STD_LOGIC
         c.in :wr_b, VHDL::STD_LOGIC
         c.in :rd, VHDL::STD_LOGIC
+        c.out :condition, VHDL::STD_LOGIC
       end
 
       e.component :control_unit do |c|
         c.in :clock, VHDL::STD_LOGIC
         c.in :reset, VHDL::STD_LOGIC
-        c.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
+        c.in :condition, VHDL::STD_LOGIC
         c.out :alu_operation, VHDL::STD_LOGIC_VECTOR(2..0)
         control_signals.each do |sig|
           c.out sig, VHDL::STD_LOGIC
         end
+        c.inout :system_bus, VHDL::STD_LOGIC_VECTOR(7..0)
       end
 
       e.behavior do |b|
@@ -153,8 +157,8 @@ class Computer
         b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
         b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
-        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu
-        b.instance :control_unit, "control0", [:clock, :reset, :system_bus, :alu_operation] + control_signals
+        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu, :alu_condition
+        b.instance :control_unit, "control0", [:clock, :reset, :alu_condition, :alu_operation] + control_signals + [:system_bus]
         b.assign :bus_inspection, :system_bus
       end
     end
@@ -184,7 +188,11 @@ class Computer
     end
 
     def microcode
-      steps.map &:to_microcode
+      steps.map(&:to_microcode).flatten
+    end
+
+    def if(condition, &body)
+      @steps << Conditional.new(condition, &body)
     end
   end
   
@@ -198,14 +206,60 @@ class Computer
 
     def opcode
       return {
+        :and        => "001",
+        :or         => "010",
         :complement => "011",
-        :and => "001",
-        :add => "100",
-        :subtract => "101"}[@op]
+        :add        => "100",
+        :subtract   => "101",
+        :equal      => "110",
+        :lessthan   => "111"}[@op]
     end
   end
 
   private
+
+  class Conditional
+    def initialize(condition)
+      @condition = condition # instance of ALUOperation
+      @steps = []
+      @true_body = []
+      yield self
+    end
+
+    # DSL method
+    def move(target, source)
+      @steps << RTL.new(target, source)
+    end
+
+    def to_microcode
+      steps = []
+      steps << MicrocodeState.new do |state|
+        state.control_signals = ["rd_#{@condition.operands.first}", "wr_alu_a"]
+        state.alu_op = @condition
+      end
+      conditional = MicrocodeState.new do |state|
+        op = @condition.operands.last
+        state.control_signals = ["wr_alu_b"]
+
+        if op.is_a? Fixnum
+          state.constant_value = op
+        else
+          state.control_signals += "rd_#{op}"
+        end
+
+        state.alu_op = @condition
+        state.condition = @condition
+      end
+      steps << conditional
+
+      body = @steps.map(&:to_microcode).flatten
+      conditional.body_size = body.length
+
+      body.each {|state| state.conditional = conditional}
+
+      return steps + body
+    end
+  end
 
   class RTL
     def initialize(target, source)
@@ -251,7 +305,9 @@ class Computer
   end
 
   class MicrocodeState
-    attr_accessor :control_signals, :alu_op, :constant_value, :next
+    attr_accessor :control_signals, :alu_op, :constant_value, :next,
+      :condition, :conditional, :body_size, :index
+
     def initialize(&blk)
       yield(self) if blk
     end
@@ -260,14 +316,29 @@ class Computer
   def make_states(instructions)
     states = {}
     instructions.each do |instr|
-      steps = instr.microcode.flatten
-      steps.each_with_index do |step, index|
-        if index + 1 < steps.length
-          step.next = instr.name+"_"+(index+1).to_s
+      steps = instr.microcode
+      indexes = {nil => 0}
+      steps.each do |step|
+        indexes[step.conditional] ||= 0
+        index = indexes[step.conditional]
+
+        if step.conditional
+          if index < step.conditional.body_size - 1
+            step.next = instr.name+"_"+(step.conditional.index.to_s)+"_"+(index+1).to_s
+          else
+            step.next = step.conditional.next
+          end
+          states[instr.name+"_"+(step.conditional.index.to_s)+"_"+index.to_s] = step
         else
-          step.next = :fetch
+          if index < steps.reject(&:conditional).length - 1
+            step.next = instr.name+"_"+(index+1).to_s
+          else
+            step.next = :fetch
+          end
+          states[instr.name+"_"+index.to_s] = step
         end
-        states[instr.name+"_"+index.to_s] = step
+        step.index = index
+        indexes[step.conditional] += 1
       end
     end
 
@@ -319,4 +390,8 @@ end
 
 def subtract(operand1, operand2)
   Computer::ALUOperation.new(:subtract, operand1, operand2)
+end
+
+def equal(operand1, operand2)
+  Computer::ALUOperation.new(:equal, operand1, operand2)
 end

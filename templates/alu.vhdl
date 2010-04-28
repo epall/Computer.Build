@@ -28,6 +28,7 @@ BEGIN
   PROCESS(op, operand_a, operand_b)
   BEGIN
     condition <= '0';
+    result <= "00000000";
     CASE op IS
       WHEN "000" =>
         result <= operand_a;
@@ -42,23 +43,13 @@ BEGIN
       WHEN "101" =>
         result <= operand_a - operand_b;
       WHEN "110" =>
-        IF operand_a = "00000000" THEN
-          result <= "11111111";
+        IF operand_a = operand_b THEN
           condition <= '1';
-        ELSE
-          result <= "00000000";
-          condition <= '0';
         END IF;
       WHEN "111" =>
         IF operand_a < operand_b THEN
-          result <= "11111111";
           condition <= '1';
-        ELSE
-          result <= "00000000";
-          condition <= '0';
         END IF;
-      WHEN others =>
-        result <= operand_a;
     END CASE;
   END PROCESS;
 

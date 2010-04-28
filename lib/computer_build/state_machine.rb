@@ -27,11 +27,12 @@ module ComputerBuild
   end
 
   class StateMachine
+    include VHDL::Helpers
     def initialize(name, body)
       @name = name
-      @inputs = {}
-      @outputs = {}
-      @inouts = {}
+      @inputs = []
+      @outputs = []
+      @inouts = []
       @signals = []
       @states = []
       @transitions = []
@@ -44,7 +45,7 @@ module ComputerBuild
     end
 
     def input(name, type)
-      @inputs[name] = type
+      @inputs << [name, type]
     end
 
     def outputs(*rest)
@@ -52,11 +53,11 @@ module ComputerBuild
     end
 
     def output(name, type)
-      @outputs[name] = type
+      @outputs << [name, type]
     end
 
     def inout(name, type)
-      @inouts[name] = type
+      @inouts << [name, type]
     end
 
     def signal(*rest)
@@ -83,15 +84,18 @@ module ComputerBuild
       representation = entity(@name) do |e|
         e.port "clock", :in, VHDL::STD_LOGIC
 
-        @inputs.each do |name, type|
+        @inputs.each do |pair|
+          name, type = pair
           e.port name, :in, type
         end
 
-        @outputs.each do |name, type|
+        @outputs.each do |pair|
+          name, type = pair
           e.port name, :out, type
         end
 
-        @inouts.each do |name, type|
+        @inouts.each do |pair|
+          name, type = pair
           e.port name, :inout, type
         end
 

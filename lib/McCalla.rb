@@ -44,4 +44,10 @@ Computer.Build "mccalla" do |computer|
   computer.instruction "jmp" do |i|
     i.move :pc, bitwise_and(:IR, 0x0F)
   end
+
+  computer.instruction "bra0" do |i|
+    i.if equal(:A, 0) do |thn|
+      thn.move :pc, bitwise_and(:IR, 0x0F)
+    end
+  end
 end

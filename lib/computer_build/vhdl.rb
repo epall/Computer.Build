@@ -387,6 +387,16 @@ module VHDL
     end
   end
 
+  class Invert < InlineStatement
+    def initialize(body)
+      @body = body
+    end
+
+    def generate
+      "NOT (#{@body})"
+    end
+  end
+
   class Block < MultiLineStatement
     include StatementBlock
 
@@ -395,40 +405,46 @@ module VHDL
       body.call(self)
     end
   end
-end
 
 # Global scope methods for creating stuff
 
-def entity(name, &body)
-  VHDL::Entity.new(name, body)
-end
+  module Helpers
+    def entity(name, &body)
+      VHDL::Entity.new(name, body)
+    end
 
-def assign(target, expression)
-  VHDL::Assign.new(target, expression)
-end
+    def assign(target, expression)
+      VHDL::Assign.new(target, expression)
+    end
 
-def high(target)
-  assign(target, '1')
-end
+    def high(target)
+      assign(target, '1')
+    end
 
-def low(target)
-  assign(target, '0')
-end
+    def low(target)
+      assign(target, '0')
+    end
 
-def equal(target, expression)
-  VHDL::Equal.new(target, expression)
-end
+    def equal(target, expression)
+      VHDL::Equal.new(target, expression)
+    end
 
-def event(target)
-  VHDL::Event.new(target)
-end
+    def event(target)
+      VHDL::Event.new(target)
+    end
 
-def block(&body)
-  VHDL::Block.new(body)
-end
+    def block(&body)
+      VHDL::Block.new(body)
+    end
 
-def subbits(sym, range)
-  "#{sym}(#{range.first} downto #{range.last})".to_sym
+    def subbits(sym, range)
+      "#{sym}(#{range.first} downto #{range.last})".to_sym
+    end
+
+    def invert(body)
+      VHDL::Invert.new(body)
+    end
+  end
 end
 
 # Monkeypatching
@@ -437,6 +453,14 @@ class Symbol
     return assign(self, other)
   end
 end
+
+class Fixnum
+  def to_logic(width)
+    str = self.to_s(2)
+    return "0"*(width-str.length) + str
+  end
+end
+
 
 def generate_vhdl(entity, out=$stdout)
   out.puts "LIBRARY ieee;"
