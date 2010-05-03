@@ -27,17 +27,17 @@ Computer.Build "mccalla" do |computer|
   end
 
   computer.instruction "sub" do |i|
-    i.move :MA, :IR
+    i.move :MA, bitwise_and(:IR, 0x0F)
     i.move :A, subtract(:A, :MD)
   end
 
   computer.instruction "lda" do |i|
-    i.move :MA, :IR
+    i.move :MA, bitwise_and(:IR, 0x0F)
     i.move :A, :MD
   end
 
   computer.instruction "sta" do |i|
-    i.move :MA, :IR
+    i.move :MA, bitwise_and(:IR, 0x0F)
     i.move :MD, :A
   end
 
