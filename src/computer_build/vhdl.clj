@@ -130,23 +130,26 @@
 ; inline / single-line statements
 
 (defmethod to-vhdl :<= [[type & args]]
-  (cond
-    (= (count args) 2)
-      (let [[target expression] args]
-        (str (spaces (keyword-to-str target) "<=" (keyword-to-str expression)) \;))
-    (= (count args) 4)
-      (let [[target target-index source source-index] args]
-        (str (keyword-to-str target) "(" target-index ") <= " (keyword-to-str source) "(" source-index ");"))
-    (= (count args) 6)
-      (let [[target target-start target-end source source-start source-end] args]
-        (str (keyword-to-str target) "(" target-start " downto " target-end ")"
-             " <= " (keyword-to-str source) "(" source-start " downto " source-end ");"))))
+  (let [target-str (keyword-to-str (first args))]
+    (cond
+      (= (count args) 2)
+        (let [[target expression] args]
+          (str target-str " <= " (keyword-to-str expression) \;))
+      (= (count args) 4)
+        (let [[target target-index source source-index] args]
+          (str target-str "(" target-index ") <= "
+               (keyword-to-str source) "(" source-index ");"))
+      (= (count args) 6)
+        (let [[target target-start target-end source source-start source-end] args]
+          (str target-str "(" target-start " downto " target-end ") <= "
+               (keyword-to-str source) "(" source-start " downto " source-end ");")))))
 
 (def-vhdl-inline :port [id direction kind]
   (keyword-to-str id) ": " (keyword-to-str direction) " " kind)
 
 (def-vhdl-inline :instance [component name & mappings]
-  name ": " (keyword-to-str component) " PORT MAP(" (str-join ", " (map keyword-to-str mappings)) ");")
+  name ": " (keyword-to-str component) " PORT MAP("
+                 (str-join ", " (map keyword-to-str mappings)) ");")
 
 (def-vhdl-inline :low [target]
   (to-vhdl `(<= ~target "0")))

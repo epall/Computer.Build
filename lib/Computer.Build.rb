@@ -70,14 +70,17 @@ class Computer
 
           if name == 'store_instruction'
             s.if event(:clock), VHDL::Equal.new(:clock,"0") do |thn|
-              thn.assign :opcode, "#{opcode_length-1} downto 0", :system_bus, "7 downto #{7-opcode_length+1}"
+              thn.assign :opcode, "#{opcode_length-1} downto 0",
+                :system_bus, "7 downto #{7-opcode_length+1}"
             end
           end
         end
 
         if state.condition
-          m.transition :from => name, :to => state.next, :on => VHDL::Equal.new(:condition, "0")
-          m.transition :from => name, :to => name+"_0", :on => VHDL::Equal.new(:condition, "1")
+          m.transition :from => name, :to => state.next,
+            :on => VHDL::Equal.new(:condition, "0")
+          m.transition :from => name, :to => name+"_0",
+            :on => VHDL::Equal.new(:condition, "1")
         else
           m.transition :from => name, :to => state.next if state.next
         end
@@ -153,12 +156,16 @@ class Computer
       end
 
       e.behavior do |b|
-        b.instance :program_counter, "pc", :clock, :system_bus, :system_bus, :wr_pc, :rd_pc, :inc_pc
+        b.instance :program_counter, "pc", :clock, :system_bus, :system_bus,
+          :wr_pc, :rd_pc, :inc_pc
         b.instance :reg, "ir", :clock, :system_bus, :system_bus, :wr_IR, :rd_IR
         b.instance :reg, "A", :clock, :system_bus, :system_bus, :wr_A, :rd_A
-        b.instance :ram, "main_memory", :clock, :system_bus, :system_bus, subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
-        b.instance :alu, "alu0", :clock, :system_bus, :system_bus, :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu, :alu_condition
-        b.instance :control_unit, "control0", [:clock, :reset, :alu_condition, :alu_operation] + control_signals + [:system_bus]
+        b.instance :ram, "main_memory", :clock, :system_bus, :system_bus,
+          subbits(:system_bus, 4..0), :wr_MD, :wr_MA, :rd_MD
+        b.instance :alu, "alu0", :clock, :system_bus, :system_bus,
+          :alu_operation, :wr_alu_a, :wr_alu_b, :rd_alu, :alu_condition
+        b.instance :control_unit, "control0", [:clock, :reset, :alu_condition,
+            :alu_operation] + control_signals + [:system_bus]
         b.assign :bus_inspection, :system_bus
       end
     end

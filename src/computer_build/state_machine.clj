@@ -48,11 +48,11 @@
           ; Behavior
           (process (:clock :state :reset)
                    [(if-else (= :reset "1")
-                             ; true body
-                             ~(rewrite-gotos :state reset)
-                             ; false body
-                             [
-                              (case :state ~@(flatten-states states))
-                              (if (and (event :clock) (= :clock 1))
-                              ~(vec (map (partial translate-transition :state) transitions)))
-                             ])]))))
+                         ; true body
+                         ~(rewrite-gotos :state reset)
+                         ; false body
+                         [
+                          (case :state ~@(flatten-states states))
+                          (if (and (event :clock) (= :clock 1))
+                          ~(vec (map (partial translate-transition :state) transitions)))
+                         ])]))))
