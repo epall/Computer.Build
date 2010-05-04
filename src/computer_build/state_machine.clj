@@ -42,17 +42,18 @@
           ; Ports
           ~(concat ['(:clock :in "std_logic")] inports outports)
           ; Definitions
-          ((deftype "STATE_TYPE" ~(map #(str "state_" (keyword-to-str %)) (keys states)))
+          ((deftype "STATE_TYPE"
+                    ~(map #(str "state_" (keyword-to-str %)) (keys states)))
           (signal :state "STATE_TYPE")
           ~@(map #(cons 'signal %) signals))
           ; Behavior
           (process (:clock :state :reset)
                    [(if-else (= :reset "1")
-                         ; true body
-                         ~(rewrite-gotos :state reset)
-                         ; false body
-                         [
-                          (case :state ~@(flatten-states states))
-                          (if (and (event :clock) (= :clock 1))
-                          ~(vec (map (partial translate-transition :state) transitions)))
-                         ])]))))
+                       ; true body
+                       ~(rewrite-gotos :state reset)
+                       ; false body
+                       [
+                        (case :state ~@(flatten-states states))
+                        (if (and (event :clock) (= :clock 1))
+                        ~(vec (map (partial translate-transition :state) transitions)))
+                       ])]))))

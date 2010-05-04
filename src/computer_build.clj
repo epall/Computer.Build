@@ -101,13 +101,15 @@
   execute them"
   (let [opcodes (make-opcodes instructions)
         opcode-width (count (second (first opcodes)))
-        static-states {:fetch {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
-                       :store_instruction {:next :decode,
-                                           :control-signals '(:rd_MD, :wr_IR, :inc_pc),
-                                           :code
-                                           [`(if (and (event :clock) (= :clock 0))
-                                               (<= :opcode ~(- opcode-width 1) 0
-                                                   :system_bus 7 ~(- 8 opcode-width)))]}
+        static-states {:fetch 
+                         {:control-signals '(:rd_pc, :wr_MA), :next :store_instruction}
+                       :store_instruction
+                         {:next :decode,
+                          :control-signals '(:rd_MD, :wr_IR, :inc_pc),
+                          :code
+                          [`(if (and (event :clock) (= :clock 0))
+                              (<= :opcode ~(- opcode-width 1) 0
+                                  :system_bus 7 ~(- 8 opcode-width)))]}
                        :decode {:control-signals '()}}
         states (merge (make-states instructions) static-states)
         control-signals (set (apply concat (map

@@ -146,13 +146,14 @@ module VHDL
     end
 
     def generate(out, indent)
-      out.puts "  "*indent + "COMPONENT #{@name}"
-      out.puts "  "*indent + "PORT("
+      prefix = "  " * indent
+      out.puts prefix + "COMPONENT #{@name}"
+      out.puts prefix + "PORT("
       @ports.each_with_index do |port, index|
         port.generate(out, indent+1, (index == @ports.length-1))
       end
-      out.puts "  "*indent + ");"
-      out.puts "  "*indent + "END COMPONENT;"
+      out.puts prefix + ");"
+      out.puts prefix + "END COMPONENT;"
     end
   end
 
@@ -313,28 +314,29 @@ module VHDL
     end
 
     def generate(out, indent)
+      prefix = "  " * indent
       if @compound
         conditions = @conditions.first.map(&:generate).join(' and ')
-        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        out.puts(prefix+"IF #{conditions} THEN")
         @clauses.first.each {|s| s.generate(out, indent+1)}
         @clauses[1..100].zip(@conditions[1..100]).each do |statements, conditions|
           conditions = conditions.map(&:generate).join(' and ')
-          out.puts(("  "*indent)+"ELSIF #{conditions} THEN")
+          out.puts(prefix+"ELSIF #{conditions} THEN")
           statements.each {|s| s.generate(out, indent+1)}
         end
-        out.puts(("  "*indent)+"END IF;")
+        out.puts(prefix+"END IF;")
       elsif @whentrue
         conditions = @conditions.map(&:generate).join(' and ')
-        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        out.puts(prefix+"IF #{conditions} THEN")
         @whentrue.each {|s| s.generate(out, indent+1)}
-        out.puts(("  "*indent)+"ELSE")
+        out.puts(prefix+"ELSE")
         @statements.each {|s| s.generate(out, indent+1)}
-        out.puts(("  "*indent)+"END IF;")
+        out.puts(prefix+"END IF;")
       else
         conditions = @conditions.map(&:generate).join(' and ')
-        out.puts(("  "*indent)+"IF #{conditions} THEN")
+        out.puts(prefix+"IF #{conditions} THEN")
         @statements.each {|s| s.generate(out, indent+1)}
-        out.puts(("  "*indent)+"END IF;")
+        out.puts(prefix+"END IF;")
       end
     end
   end
