@@ -36,7 +36,6 @@ module ComputerBuild
       @signals = []
       @states = []
       @transitions = []
-      @constants = []
       body[self]
     end
 
@@ -76,10 +75,6 @@ module ComputerBuild
       @transitions << Transition.new(options)
     end
 
-    def constant(*args)
-      @constants << VHDL::Constant.new(*args)
-    end
-
     def generate(out)
       representation = entity(@name) do |e|
         e.port "clock", :in, VHDL::STD_LOGIC
@@ -104,8 +99,6 @@ module ComputerBuild
         @signals.each do |args|
           e.signal(*args)
         end
-
-        e.constants = @constants
 
         e.behavior do |b|
           b.process [:clock, :reset, :state] do |p|

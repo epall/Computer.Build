@@ -10,6 +10,19 @@
 (defn wr [port]
   (keyword (str "wr_" (name port))))
 
+(defn binary* [accumulator num]
+  (let [last-bit (if (even? num) "0" "1")]
+    (cond
+      (= 0 num) (str "0" accumulator)
+      (= 1 num) (str "1" accumulator)
+      true (recur (str last-bit accumulator) (int (/ num 2))))))
+
+(defn binary [width num]
+  "Convert number to binary literal format expected in VHDL"
+  (let [value (binary* "" num)
+        length (count value)]
+    (str (apply str (repeat (- width length) "0")) value)))
+
 (defn alu-op-to-opcode [op]
   (if op
     (cond
@@ -56,7 +69,7 @@
 (defn make-states-for-instruction [[_ instruction-name & RTLs]]
   (let [microcode (flatten-1 (map rtl-to-microcode RTLs))
         last-index (- (count microcode) 1)
-        make-state (fn [body index]
+        link-state (fn [body index]
                      {(name-for-state instruction-name index)
                       ; add next state to instruction body
                       (assoc body
@@ -68,7 +81,7 @@
                                (name-for-state
                                  instruction-name
                                  (+ index 1))))})]
-    (apply merge (map make-state microcode (iterate inc 0)))))
+    (apply merge (map link-state microcode (iterate inc 0)))))
 
 (defn make-states [instructions]
   "Given a set of instructions, create the set of states
@@ -94,6 +107,9 @@
            (:code state)
            assertions
            clears
+           (if-let [const (:constant-value state)]
+             `((<= :system_bus ~(binary 8 const)))
+             `((<= :system_bus ~(apply str (repeat 8 "Z")))))
            `((<= :alu_operation ~(alu-op-to-opcode (:alu_op state))))))))
 
 (defn control-unit [instructions]
@@ -115,7 +131,7 @@
         control-signals (set (apply concat (map
                                              (fn [[_ body]] (:control-signals body))
                                              states)))
-        inputs {:reset std-logic :system_bus (std-logic-vector 7 0)}
+        inputs {:reset std-logic}
         outputs (assoc
                   (zipmap control-signals (repeat (count control-signals) std-logic))
                   :alu_operation (std-logic-vector 2 0))]
@@ -125,11 +141,14 @@
                inputs
                ; outputs
                outputs
+               ; input/outputs
+               {:system_bus (std-logic-vector 7 0)}
                ; signals
                { :opcode (std-logic-vector (- opcode-width 1) 0) }
                ; reset
                (list* '(<= :alu_operation "000")
                       '(goto :fetch)
+                      '(<= :system_bus "ZZZZZZZZ")
                       (map #(list 'low %) control-signals))
                ; states
                (mapmap (partial realize-state control-signals) states)
@@ -216,7 +235,9 @@
             (:rd :in ~std-logic))
 
           (component :control_unit
-            ~@(concat (map input control-in) (map output control-out)))
+            ~@(concat (map input control-in)
+                      (map output control-out)
+                      `((:system_bus :inout ~(std-logic-vector 7 0)))))
             ]
           ; architecture
           [
@@ -232,6 +253,6 @@
                     :wr_alu_a :wr_alu_b :rd_alu)
           (instance :control_unit "control0"
                     ; same ports as the control signals we got
-                    ~@(map first (concat control-in control-out)))
+                    ~@(map first (concat control-in control-out)) :system_bus)
           (<= :bus_inspection :system_bus)
           ]))))))

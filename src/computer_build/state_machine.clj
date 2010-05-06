@@ -32,15 +32,16 @@
             ~(second transition))
      [(<= ~state-variable ~(state-from-name (last transition)))])))
 
-(defn state-machine [name inputs outputs signals reset states transitions]
+(defn state-machine [name inputs outputs inouts signals reset states transitions]
 	"Create a state machine that operates from the given inputs, triggering
 	the specified transitions to the listed states that generate outputs on
 	the signals in the outputs array"
   (let [inports (reformat-ports inputs :in)
-        outports (reformat-ports outputs :out)]
+        outports (reformat-ports outputs :out)
+        inoutports (reformat-ports inouts :inout)]
 	`(entity ~name
           ; Ports
-          ~(concat ['(:clock :in "std_logic")] inports outports)
+          ~(concat ['(:clock :in "std_logic")] inports outports inoutports)
           ; Definitions
           ((deftype "STATE_TYPE"
                     ~(map #(str "state_" (keyword-to-str %)) (keys states)))

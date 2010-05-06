@@ -78,7 +78,6 @@ module VHDL
       @signals = []
       @types = []
       @components = []
-      @constants = []
       body[self]
     end
 
@@ -103,10 +102,6 @@ module VHDL
       @components << Component.new(*args, &body)
     end
 
-    def constants=(consts)
-      @constants = consts
-    end
-
     def generate(out=$stdout)
       out.puts "ENTITY #{@name} IS"
       out.puts "PORT("
@@ -119,7 +114,6 @@ module VHDL
       @types.each {|t| t.generate(out, 1)}
       @signals.each {|t| t.generate(out, 1)}
       @components.each {|c| c.generate(out, 1)}
-      @constants.each {|c| c.generate(out, 1)}
       out.puts "BEGIN"
       @behavior.generate(out, 1)
       out.puts "END arch_#{@name};"
@@ -190,18 +184,6 @@ module VHDL
 
     def line
       "SIGNAL #{@id} : #{@type};"
-    end
-  end
-
-  class Constant < SingleLineStatement
-    def initialize(name, type, value)
-      @name = name
-      @type = type
-      @value = value
-    end
-
-    def line
-      "CONSTANT #{@name} : #{@type} := #{quoted(@value)};"
     end
   end
 

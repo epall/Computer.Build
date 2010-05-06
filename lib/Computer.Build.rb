@@ -42,10 +42,6 @@ class Computer
       m.signal :opcode,
         VHDL::STD_LOGIC_VECTOR((opcode_length-1)..0)
 
-      states.values.map(&:constant_value).compact.uniq.each do |const|
-        m.constant "CONSTANT_#{const}", VHDL::STD_LOGIC_VECTOR(7..0), const.to_logic(8)
-      end
-
       m.reset do |r|
         r.goto :fetch
         control_signals.each do |sig|
@@ -63,7 +59,7 @@ class Computer
           s.assign :alu_operation, state.alu_op ? state.alu_op.opcode : "000"
 
           if state.constant_value
-            s.assign :system_bus, "CONSTANT_#{state.constant_value}".to_sym
+            s.assign :system_bus, state.constant_value.to_logic(8)
           else
             s.assign :system_bus, "ZZZZZZZZ"
           end
