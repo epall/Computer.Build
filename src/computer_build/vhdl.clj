@@ -58,8 +58,7 @@
 ; Multi-line statement that causes an extraneous level of nesting in AST
 (defmacro def-vhdl-multiline [kword bindings & body]
   `(defmethod to-vhdl ~kword [~(vec (concat '[_] bindings))]
-     (not-indented (list
-       ~@body))))
+     (not-indented (list ~@body))))
 
 ; Inline or single-line statements that don't produce a list of lines
 (defmacro def-vhdl-inline [kword bindings & body]
