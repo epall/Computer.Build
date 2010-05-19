@@ -208,10 +208,12 @@
 
 (defn build* [cpuname options instructions]
   (.mkdir (java.io.File. cpuname))
-  (let [[control-unit control-in control-out] (control-unit instructions)]
+  (let [[control-unit control-in control-out] (control-unit instructions)
+        control-signals (concat (dissoc control-in :clock :reset) control-out)
+        dynamic-signals (map (fn [[k v]] (list 'signal k v)) control-signals)]
     (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))
                 control-vhdl (java.io.FileWriter. (str cpuname "/control.vhdl"))]
-      ;(pprint control-unit)
+      (pprint dynamic-signals)
       (binding [*out* control-vhdl]
         (generate-vhdl control-unit))
       (binding [*out* main-vhdl]
@@ -221,26 +223,9 @@
            (:reset :in ~std-logic)
            (:bus_inspection :out ~(std-logic-vector 7 0))]
           ; defs
-          [(signal :system_bus ~(std-logic-vector 7 0))
-          (signal :condition ~std-logic)
-          (signal :alu_operation ~(std-logic-vector 2 0))
-          (signal :opcode ~(std-logic-vector 7 5))
-          (signal :wr_pc ~std-logic)
-          (signal :rd_pc ~std-logic)
-          (signal :inc_pc ~std-logic)
-          (signal :wr_IR ~std-logic)
-          (signal :rd_IR ~std-logic)
-          (signal :wr_MA ~std-logic)
-          (signal :wr_MD ~std-logic)
-          (signal :rd_MD ~std-logic)
-          (signal :wr_A ~std-logic)
-          (signal :rd_A ~std-logic)
-          (signal :wr_B ~std-logic)
-          (signal :rd_B ~std-logic)
-          (signal :wr_alu_a ~std-logic)
-          (signal :wr_alu_b ~std-logic)
-          (signal :rd_alu ~std-logic)
-          
+          [~@dynamic-signals
+           (signal :system_bus ~(std-logic-vector 7 0))
+                    
           (component :reg
             (:clock :in ~std-logic)
             (:data_in :in ~(std-logic-vector 7 0))
