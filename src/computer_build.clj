@@ -1,5 +1,8 @@
 (ns computer-build
-  (:use computer-build.vhdl computer-build.state-machine clojure.set))
+  (:use computer-build.vhdl
+        computer-build.state-machine
+        clojure.set
+        clojure.contrib.pprint))
 
 (defmacro build [cpuname options & instructions]
   `(build* ~cpuname ~options (quote ~instructions)))
@@ -26,9 +29,11 @@
 (defn alu-op-to-opcode [op]
   (if op
     (cond
-      (= (name op) "complement") "101"
-      (= (name op) "+") "010"
-      (= (name op) "-") "110")
+      (= (name op) "and") "001"
+      (= (name op) "complement") "011"
+      (= (name op) "+") "100"
+      (= (name op) "-") "101"
+      (= (name op) "=") "110")
     "000"))
 
 (defn flatten-1 [things]
@@ -43,7 +48,7 @@
   f with the value"
   (zipmap (keys m) (map f (vals m))))
 
-(defn rtl-to-microcode [[target _ source]]
+(defn rtl-to-microcode [[target _ source & conditional-body]]
   (cond
     (number? source) ; constant-to-register
     {:control-signals (list (wr target)),
@@ -51,6 +56,25 @@
 
     (symbol? source) ; register-to-register
     {:control-signals (list (rd source) (wr target))}
+
+    (= "if" (name target)) ; conditional
+    (let [[condition target expectation] _
+          body (flatten-1 (map rtl-to-microcode (cons source conditional-body)))]
+      (list
+        ; load target
+        {:control-signals (list (rd target) (wr :alu_a)) }
+        ; load expectation and compare
+        (if (number? expectation)
+          {:control-signals (list (wr :alu_b))
+           :constant-value expectation
+           :alu_op condition
+           :conditional true
+           :body body}
+          {:control-signals (list (rd expectation) (wr :alu_b))
+           :alu_op condition
+           :conditional true
+           :body body})
+        ))
 
     (and (seq? source) (symbol? (first source))) ; ALU-to-register
     (let [[alu_op operand_a operand_b] source]
@@ -66,22 +90,29 @@
 (defn name-for-state [instruction-name index]
   (keyword (str instruction-name "_" index)))
 
+(defn link-state [instruction-name last-index body index]
+  (let [next-state
+          (if (= index last-index)
+            :fetch
+            (name-for-state instruction-name (+ index 1)))
+        connected-body
+          {(name-for-state instruction-name index)
+            (assoc body :next next-state)}]
+  (if-let [conditional-body (:body body)]
+    ; conditional
+    (let [instruction-name (str instruction-name "_" index)
+          last-index (dec (count conditional-body))]
+      (merge connected-body
+             (apply merge (map (partial link-state instruction-name last-index)
+                               conditional-body (iterate inc 0)))))
+    ; not conditional
+    connected-body)))
+
 (defn make-states-for-instruction [[_ instruction-name & RTLs]]
   (let [microcode (flatten-1 (map rtl-to-microcode RTLs))
-        last-index (- (count microcode) 1)
-        link-state (fn [body index]
-                     {(name-for-state instruction-name index)
-                      ; add next state to instruction body
-                      (assoc body
-                             :next
-                             (if (= index last-index)
-                               ; then
-                               :fetch
-                               ; else
-                               (name-for-state
-                                 instruction-name
-                                 (+ index 1))))})]
-    (apply merge (map link-state microcode (iterate inc 0)))))
+        last-index (- (count microcode) 1)]
+    (apply merge (map (partial link-state instruction-name last-index)
+                      microcode (iterate inc 0)))))
 
 (defn make-states [instructions]
   "Given a set of instructions, create the set of states
@@ -128,10 +159,12 @@
                                   :system_bus 7 ~(- 8 opcode-width)))]}
                        :decode {:control-signals '()}}
         states (merge (make-states instructions) static-states)
+        conditional-states (select-keys states (for [[k v] states :when (:conditional v)] k))
+        unconditional-states (select-keys states (for [[k v] states :when (not (:conditional v))] k))
         control-signals (set (apply concat (map
                                              (fn [[_ body]] (:control-signals body))
                                              states)))
-        inputs {:reset std-logic}
+        inputs {:reset std-logic, :condition std-logic}
         outputs (assoc
                   (zipmap control-signals (repeat (count control-signals) std-logic))
                   :alu_operation (std-logic-vector 2 0))]
@@ -155,7 +188,12 @@
                ; transitions
                (concat
                  ; states
-                 (map #(list (first %) (:next (second %))) (dissoc states :decode))
+                 (map (fn [[k v]] (list k (:next v))) (dissoc unconditional-states :decode))
+                 ; conditional false
+                 (map (fn [[k v]] (list k '(= :condition 0) (:next v))) conditional-states)
+                 ; conditional true
+                 (map (fn [[k v]] (list k '(= :condition 1) (name-for-state (name k) 0))) conditional-states)
+
                  ; decode
                  (map #(list
                          ; from
@@ -173,6 +211,7 @@
   (let [[control-unit control-in control-out] (control-unit instructions)]
     (with-open [main-vhdl (java.io.FileWriter. (str cpuname "/main.vhdl"))
                 control-vhdl (java.io.FileWriter. (str cpuname "/control.vhdl"))]
+      ;(pprint control-unit)
       (binding [*out* control-vhdl]
         (generate-vhdl control-unit))
       (binding [*out* main-vhdl]
@@ -183,6 +222,7 @@
            (:bus_inspection :out ~(std-logic-vector 7 0))]
           ; defs
           [(signal :system_bus ~(std-logic-vector 7 0))
+          (signal :condition ~std-logic)
           (signal :alu_operation ~(std-logic-vector 2 0))
           (signal :opcode ~(std-logic-vector 7 5))
           (signal :wr_pc ~std-logic)
@@ -232,13 +272,13 @@
             (:op :in ~(std-logic-vector 2 0))
             (:wr_a :in ~std-logic)
             (:wr_b :in ~std-logic)
-            (:rd :in ~std-logic))
+            (:rd :in ~std-logic)
+            (:condition :out ~std-logic))
 
           (component :control_unit
             ~@(concat (map input control-in)
                       (map output control-out)
-                      `((:system_bus :inout ~(std-logic-vector 7 0)))))
-            ]
+                      `((:system_bus :inout ~(std-logic-vector 7 0)))))]
           ; architecture
           [
           (instance :program_counter "pc" :clock :system_bus :system_bus
@@ -250,7 +290,7 @@
           (instance :ram "main_memory" :clock :system_bus :system_bus
                     ~(subbits :system_bus 4 0) :wr_MD :wr_MA :rd_MD)
           (instance :alu "alu0" :clock :system_bus :system_bus :alu_operation
-                    :wr_alu_a :wr_alu_b :rd_alu)
+                    :wr_alu_a :wr_alu_b :rd_alu, :condition)
           (instance :control_unit "control0"
                     ; same ports as the control signals we got
                     ~@(map first (concat control-in control-out)) :system_bus)
